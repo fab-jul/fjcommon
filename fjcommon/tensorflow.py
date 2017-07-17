@@ -31,8 +31,13 @@ def create_session(graph=None):
     return tf.Session(config=config, graph=graph)
 
 
-def log2(x):
-    return tf.log(x) / tf.log(tf.constant(2, dtype=x.dtype))
+def logb(x, b):
+    return tf.log(x) / tf.log(tf.constant(b, dtype=x.dtype))
+
+
+log2 = functools.partial(logb, b=2)
+log10 = functools.partial(logb, b=10)
+
 
 
 def cache_some(tensors, np_dtyes, cache_size, cache_per_batch=2):
