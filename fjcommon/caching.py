@@ -18,7 +18,9 @@ def cache(cache_path):
     `cache_path` is static.
     """
     def cache_decorator(generator):
-        return lambda: cached(cache_path, generator)
+        def wrapper():
+            return cached(cache_path, generator)
+        return wrapper
     return cache_decorator
 
 
