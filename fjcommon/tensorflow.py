@@ -1,10 +1,12 @@
 import tensorflow as tf
 import numpy as np
 from contextlib import contextmanager
+import functools
 
 
 @contextmanager
 def start_queues_in_sess(init_vars=True, name=None):
+    # TODO: allow only starting a subset of queues
     with create_session() as sess:
         tf.logging.info(' '.join(filter(None, ['Session', name, 'Started'])))
         coord = tf.train.Coordinator()
@@ -52,3 +54,6 @@ def cache_some(tensors, np_dtyes, cache_size, cache_per_batch=2):
                     t_cache[cache_per_batch * i + j, :] = t_out[j * (batch_size // cache_per_batch), :]
     return caches
 
+
+get_variable_zeros = functools.partial(tf.get_variable, initializer=tf.zeros_initializer(), trainable=False)
+get_variable_ones = functools.partial(tf.get_variable, initializer=tf.ones_initializer(), trainable=False)
