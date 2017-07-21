@@ -36,6 +36,7 @@ lr_1e-6:
 
 from os import path
 import os
+import sys
 import re
 import json
 import itertools
@@ -56,30 +57,41 @@ def parse(config_p):
     return config, rel_path
 
 
-def _gen_grid_search_configs(grid_spec_p, base_config_p, outdir_name):
+def _gen_grid_search_configs(grid_spec, base_config_p, outdir):
     """
     Generates each possible combination of parameters
-    :param grid_spec_p: Path to a JSON containing a dictionary mapping parameter names to values. Example:
+    :param grid_spec: Path to a JSON or JSON string containing a dictionary mapping parameter names to values. Example:
         {"lr": [1e-06, 1e-07], "normalization": ["OFF", "FIXED"]}
     :param base_config_p: config to import into each grid spec file
-    :param outdir_name: subdir relative to the directory of base_config_p
+    :param outdir: where to save the configs
     """
-    config, _ = parse(base_config_p)
     base_config_dir, base_config_name = path.split(base_config_p)
-    outdir = path.join(base_config_dir, outdir_name)
+    outdir_to_base_dir = path.relpath(base_config_dir, outdir)  # to get nice paths like ../base
     os.makedirs(outdir, exist_ok=True)
 
-    grid_spec = json.load(open(grid_spec_p, 'r'))
+    grid_spec = _parse_grid_spec(grid_spec)
     grid_spec_its = [
         [(param, val) for val in grid_spec[param]]
         for param in sorted(grid_spec.keys())]
 
     for config in itertools.product(*grid_spec_its):
         unique_name = '_'.join(param[0] + str(val) for param, val in config)
-        with open(path.join(outdir, unique_name), 'w+') as f:
-            f.write('use ../{}\n'.format(base_config_name))
+        p = path.join(outdir, unique_name)
+        print(p)
+        with open(p, 'w+') as f:
+            f.write('use {}\n'.format(path.join(outdir_to_base_dir, base_config_name)))
             f.write('\n'.join('{} = {}'.format(param, val) for param, val in config))
             f.write('\n')
+
+
+def _parse_grid_spec(grid_spec_p):
+    if path.exists(grid_spec_p):
+        return json.load(open(grid_spec_p, 'r'))
+    try:
+        return json.loads(grid_spec_p)
+    except json.JSONDecodeError as e:
+        print('Neither valid path, or valid JSON: {}\n{}'.format(grid_spec_p, e))
+        sys.exit(1)
 
 
 def _parse(config_p):
@@ -145,11 +157,14 @@ class _Config(object):  # placeholder object filled with setattr
             raise ConstraintViolationException('{} does not fullfill constraint {} :: {}'.format(
                 var_value, var_name, allowed_var_values))
 
+    def all_params_and_values(self):
+        return ((k, v) for k, v in sorted(self.__dict__.items())
+                if re.match(r'[A-Za-z][A-Za-z_]+', k))
+
     def __str__(self):
         def _lines():
-            for k, v in sorted(self.__dict__.items()):
-                if re.match(r'[A-Za-z][A-Za-z_]+', k):
-                    yield '{} = {}'.format(k, v)
+            for k, v in self.all_params_and_values():
+                yield '{} = {}'.format(k, v)
         return '\n'.join(_lines())
 
 
@@ -157,8 +172,8 @@ class _Config(object):  # placeholder object filled with setattr
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('grid_spec_p', type=str)
+    parser.add_argument('grid_spec', type=str, help='Path or inline JSON')
     parser.add_argument('base_config_p', type=str)
-    parser.add_argument('outdir_name', type=str)
+    parser.add_argument('outdir', type=str)
     flags = parser.parse_args()
-    _gen_grid_search_configs(flags.grid_spec_p, flags.base_config_p, flags.outdir_name)
+    _gen_grid_search_configs(flags.grid_spec, flags.base_config_p, flags.outdir)
