@@ -13,6 +13,10 @@ class ProgressPrinter(object):
         ... do sth with el
     """
     def __init__(self, info=None, iter_list=None):
+        """
+        :param info: if not None, printed on call
+        :param iter_list: if not None, instance can be used as iterable
+        """
         assert iter_list is None or isinstance(iter_list, collections.Sequence), 'iter_list must be sequence'
         if info:
             print(info)
@@ -31,7 +35,7 @@ class ProgressPrinter(object):
     def __iter__(self):
         return self
 
-    def __next__(self):  # Python 3: def __next__(self)
+    def __next__(self):
         if not self.iter_list:
             raise StopIteration
         if self.iter_list_idx >= len(self.iter_list):
