@@ -11,7 +11,7 @@ file. The specified file is parsed first. If a parameter is redefined in some fi
 The following lines may contain
 
 -   constrain statement
-        constrain <PARAM_NAME> :: { <ENUM_VAL_1>, <ENUM_VAL_2>, ... }
+        constrain <PARAM_NAME> :: <CONSTRAIN_VAL_1>, <CONSTRAIN_VAL_2>, ...
 
 -   parameter statement
         <PARAM_NAME> = <PARAM_VALUE>
@@ -23,14 +23,19 @@ Example:
 
 base:
     constrain network_type :: LINEAR, DNN
+    network_type = LINEAR
+
     lr = 1e-5
     batch_size_train = 25
     batch_size_val = 0.5 * batch_size_train
-    network_type = LINEAR
 
-lr_1e-6:
-    use base
+lr_sweep/lr_1e-6:
+    use ../base
     lr = 1e-6
+
+lr_sweep/lr_1e-4:
+    use ../base
+    lr = 1e-4
 
 """
 
