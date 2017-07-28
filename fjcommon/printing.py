@@ -20,17 +20,19 @@ class ProgressPrinter(object):
         assert iter_list is None or isinstance(iter_list, collections.Sequence), 'iter_list must be sequence'
         if info:
             print(info)
+        self.did_update_line = False
         self.iter_list = iter_list
         self.iter_list_idx = 0
 
-    @staticmethod
-    def update(p):
+    def update(self, p):
+        self.did_update_line = True
         progress_print(p)
 
-    @staticmethod
-    def finish_line():
-        progress_print(-1, _reset_cache=True)
-        print()  # Finish line
+    def finish_line(self):
+        if self.did_update_line:
+            self.did_update_line = False
+            progress_print(-1, _reset_cache=True)
+            print()  # Finish line
 
     def __iter__(self):
         return self
@@ -63,4 +65,5 @@ def progress_print(p, _last_pstr_cache=[''], _reset_cache=False):
     if _last_pstr_cache[0] != pstr:  # prevents flickering on some consoles: only update if something changed!
         _last_pstr_cache[0] = pstr
         print('\r{}'.format(pstr), end='')
+
 
