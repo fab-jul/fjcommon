@@ -12,7 +12,8 @@ def get_element_at(element_idx, it):
     try:
         return it[element_idx]
     except TypeError:
-        for i, el in enumerate(it):
-            if i == element_idx:
-                return el
-        raise IndexError('Iterator does not have {} elements'.format(element_idx))
+        pass
+    for i, el in enumerate(it):
+        if i == element_idx:
+            return el
+    raise IndexError('Iterator does not have {} elements'.format(element_idx))

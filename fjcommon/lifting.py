@@ -3,7 +3,7 @@ def lift1d(n):
     then unpack lists before returning """
     def decorator(fn):
         def new_fn(*args, **kwargs):
-            assert len(args) >= n, 'First {} arguments expected to be non-keyword'
+            assert len(args) >= n, 'Expected first {} arguments to be non-keyword'
             args_to_lift, args_remaining = args[:n], args[n:]
             all_are_1d = all(not isinstance(arg, list) for arg in args_to_lift)
             none_is_1d = all(isinstance(arg, list) for arg in args_to_lift)
@@ -16,7 +16,7 @@ def lift1d(n):
             ret = fn(*args_lifted, **kwargs)
             if not ret or not all_are_1d:
                 return ret
-            if isinstance(ret, tuple):
+            if isinstance(ret, tuple):  # unpack lists again
                 return tuple(r[0] for r in ret)
             return ret[0]
         return new_fn
