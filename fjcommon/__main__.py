@@ -1,9 +1,15 @@
 import argparse
-from fjcommon import tf_records
+from fjcommon import images
+
+
+def _tf_records():  # loads TF, which is slow
+    from fjcommon import tf_records
+    return tf_records
 
 
 files = {
-    'tf_records': tf_records
+    'tf_records': _tf_records(),
+    'images': images
 }
 
 parser = argparse.ArgumentParser()
