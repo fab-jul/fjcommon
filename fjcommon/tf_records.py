@@ -143,24 +143,29 @@ def read_records_with_features_dict(records_glob, features_dict, num_epochs=None
 def main(args):
     parser = argparse.ArgumentParser()
     mode_subparsers = parser.add_subparsers(dest='mode', title='Mode')
+    # Make image records ---
     parser_make = mode_subparsers.add_parser('mk_img_recs')
     parser_make.add_argument('out_dir', type=str)
     parser_make.add_argument('image_dir', type=str)
     parser_make.add_argument('--num_per_shard', type=int, required=True)
+    # Make image records, distributed ---
     parser_make_dist = mode_subparsers.add_parser('mk_img_recs_dist')
     parser_make_dist.add_argument('out_dir', type=str)
     parser_make_dist.add_argument('image_dir', type=str)
     parser_make_dist.add_argument('--job_id', type=int, required=True)
     parser_make_dist.add_argument('--num_jobs', type=int, required=True)
     parser_make_dist.add_argument('--num_per_shard', type=int, required=True)
+    # Join image records ---
     parser_join = mode_subparsers.add_parser('join')
     parser_join.add_argument('out_dir', type=str)
     parser_join.add_argument('--num_jobs', type=int, required=True)
+    # Extract image Records ---
     parser_extract = mode_subparsers.add_parser('extract')
     parser_extract.add_argument('records_glob', type=str)
     parser_extract.add_argument('out_dir', type=str)
     parser_extract.add_argument('max_imgs', type=int)
     parser_extract.add_argument('--feature_key', type=str, default=_DEFAULT_FEATURE_KEY)
+    # ---
     flags = parser.parse_args(args)
     if flags.mode == 'mk_img_recs':
         create_images_records_distributed(

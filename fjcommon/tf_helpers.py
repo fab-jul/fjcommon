@@ -236,7 +236,7 @@ class VersionAwareSaver(object):
                 unrestored = [var for var in current_vars if var.name not in restorable_var_names]
                 if unrestored:
                     tf.logging.warn('Not restored: {}'.format(unrestored))
-                    self.init_unrestored_op = tf.initialize_variables(unrestored)
+                    self.init_unrestored_op = tf.variables_initializer(unrestored)
         else:
             var_list = current_vars
             self._set_restorable_var_names([var.name for var in current_vars])
