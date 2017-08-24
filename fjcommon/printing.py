@@ -1,6 +1,21 @@
 import collections
 
 
+def print_join(it, joiner='\n'):
+    """
+    Like print(joiner.join(it)) but for iterators that take a long time to produce elements, this version prints
+    elements as they are available
+    """
+    it = iter(it)
+    first = next(it)
+    print(first, flush=True, end='')
+    for el in it:
+        print(joiner + el, flush=True, end='')
+
+
+# Progress Printing ------------------------------------------------------------
+
+
 class ProgressPrinter(object):
     """
     Supports usage as context manager or iterator:
