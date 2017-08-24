@@ -1,7 +1,9 @@
 import tensorflow as tf
 import numpy as np
+
 from contextlib import contextmanager
 import functools
+import itertools
 from collections import OrderedDict, namedtuple
 import os
 import sys
@@ -126,6 +128,47 @@ def reverse_every_other_row(inp, batch_axis=0, seq_axis=1):
     seq_lengths = tf.reshape(seq_lengths, [-1])[:h]  # flatten and trim
 
     return tf.reverse_sequence(inp, seq_lengths=seq_lengths, seq_dim=seq_axis, batch_axis=batch_axis)
+
+
+# Variable Learning Rates ------------------------------------------------------
+
+
+def create_train_op_with_different_lrs(total_loss, optimizer_default, special_optimizers_and_vars):
+    """
+    :param total_loss: loss to minimize
+    :param optimizer_default: optimizer to use for all variables not assigned to one of the special optimizers
+    :param special_optimizers_and_vars: list of tuples (Optimizer, [variables]). Note: this also works if
+                len(special_optimizers_and_vars) == 0
+    :return: tf.group of training steps
+    """
+    trainable_vars = tf.trainable_variables()
+    all_vars_special = list(itertools.chain.from_iterable((vs for _, vs in special_optimizers_and_vars)))
+    trainable_vars_without_special = [var for var in trainable_vars if var not in all_vars_special]
+    assert len(trainable_vars) == len(trainable_vars_without_special) + len(all_vars_special), \
+        "{} does not contain each {} exactly once".format(trainable_vars, all_vars_special)
+
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    all_vars_sorted = trainable_vars_without_special + all_vars_special
+    with tf.control_dependencies(update_ops):
+        grads = tf.gradients(total_loss, all_vars_sorted)
+
+    global_step = tf.contrib.slim.get_or_create_global_step()
+    grads_special_start_idx = len(trainable_vars_without_special)
+    grads_default = grads[:grads_special_start_idx]
+    train_steps = [
+        optimizer_default.apply_gradients(
+            zip(grads_default, trainable_vars_without_special), global_step=global_step)]
+    for optimizer_special, vars_special in special_optimizers_and_vars:
+        grads_end_idx = grads_special_start_idx + len(vars_special)
+        grads_special = grads[grads_special_start_idx:grads_end_idx]
+        grads_special_start_idx = grads_end_idx
+        train_steps.append(
+            optimizer_special.apply_gradients(zip(grads_special, vars_special)))
+    assert grads_special_start_idx == len(all_vars_sorted), '{} != {}'.format(grads_special_start_idx, len(all_vars_sorted))
+
+    return tf.group(*train_steps)
+
+
 # Caching ----------------------------------------------------------------------
 
 
