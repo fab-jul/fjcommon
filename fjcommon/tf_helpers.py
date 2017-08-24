@@ -486,12 +486,14 @@ class ImageSaver(object):
         self.augment_fetch_dict(fetch_dict, output_tensor)
         return fetch_dict
 
-    def save(self, fetched_tensors, img_names):
+    def save(self, fetched_tensors, img_names, chmod=0o755):
         """
         Saves fetched images.
         :param fetched_tensors: Result of a call to session.run(fetches) where previously,
         augment_fetch_dict(fetches, output) was called.
-        :param img_names: list of lenght batch_size
+        :param img_names: list of length batch_size. Image will be saved at 'self.img_dir/img_names[i]', i.e.,
+        names may contain slashes. The corresponding dirs will be created if necessary.
+        :param chmod: if not None, chmod the resulting image, up to self.img_dir
         """
         assert self.fetch_dict_key in fetched_tensors, 'Use augment_fetch_dict'
         img_out = fetched_tensors[self.fetch_dict_key]
@@ -502,6 +504,11 @@ class ImageSaver(object):
             img_out_p = path.join(self.img_dir, img_names[batch])
             if not img_out_p.endswith('.png'):
                 img_out_p += '.png'
-            img_out = img_out[batch, ...]
-            self.save_img(name=img_out_p, arr=img_out)
+            img_out_b = img_out[batch, ...]
+            os.makedirs(path.dirname(img_out_p), exist_ok=True)
+            self.save_img(name=img_out_p, arr=img_out_b)
+            if chmod is not None:
+                os_ext.chmodr(img_out_p, chmod, upto=path.dirname(self.img_dir))
+
+        return img_out
 
