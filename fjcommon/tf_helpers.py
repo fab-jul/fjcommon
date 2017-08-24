@@ -10,6 +10,7 @@ import sys
 from os import path
 import pickle
 from fjcommon import lifting
+from fjcommon import os_ext
 
 
 # Session ----------------------------------------------------------------------
@@ -215,6 +216,20 @@ class _Loggable(object):
 
 
 class LoggerOutput(object):
+    """
+    Esample Usage:
+
+        logger = Logger()
+        ... # setup logger
+        logger.log().add_to_tensorboard(fw, itr).add_to_console(itr)
+
+    or
+
+        log_output = logger.log()
+        ... # do something with log_output
+        log_output.add_to_tensorboard(fw, itr).add_to_console(itr)
+
+    """
     def __init__(self, log_str, tags_and_values):
         self.log_str = log_str
         self.tags_and_values = tags_and_values
@@ -252,6 +267,7 @@ class Logger(object):
         self._loggables[name] = _Loggable(
             operation, to_value=lambda x: x, format_str=format_str, add_summary=add_summary)
 
+    # TODO Evaluate if this should be implemented with tf.py_func
     def add_loggable_function(self, name, f, arg_tensors, format_str=_LOGGER_DEFAULT_FORMAT_STR, add_summary=None):
         """
         :param name: name to print
@@ -287,11 +303,11 @@ class Logger(object):
         if fetched is None:
             assert self._fetcher is not None
             fetched = self._fetcher()
-        fetched = self._filter_required(fetched)
+        fetched = self._remove_non_loggables(fetched)
         log_str, log_tags_and_values = self._get_log_str_and_values(fetched, joiner)
         return LoggerOutput(log_str=log_str, tags_and_values=log_tags_and_values)
 
-    def _filter_required(self, fetched):
+    def _remove_non_loggables(self, fetched):
         assert isinstance(fetched, dict)
         return {name: val for name, val in fetched.items() if name in self._loggables}
 
@@ -398,7 +414,7 @@ def histogram_nd(name, values, L, num_rows=100):
     with tf.control_dependencies([histogram_current_idx_inc]):
         # write histo_slice to the current index in the histogram
         update_op = tf.scatter_update(histogram, histogram_current_idx, histo_slice)
-        
+
     return histogram, update_op
 
 
