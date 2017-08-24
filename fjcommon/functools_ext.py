@@ -1,7 +1,7 @@
-""" Extens functools"""
+""" Extends functools """
 
 
-# Allows user to write import functools_ext to get everything from functools
+# Allows user to `import functools_ext` without having to also `import functools`
 from functools import *
 
 
