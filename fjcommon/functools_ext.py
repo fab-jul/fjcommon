@@ -1,7 +1,8 @@
 """ Extens functools"""
 
 
-import functools
+# Allows user to write import functools_ext to get everything from functools
+from functools import *
 
 
 def compose(*args):
@@ -14,5 +15,5 @@ def compose(*args):
             return f1(f2(*args_c, **kwargs_c))
         return composed
 
-    return functools.reduce(compose2, args)
+    return reduce(compose2, args)
 
