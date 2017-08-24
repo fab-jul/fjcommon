@@ -39,6 +39,42 @@ def create_session(graph=None):
     return tf.Session(config=config, graph=graph)
 
 
+# Static Asserts ---------------------------------------------------------------
+
+
+def assert_dtype(x, dtype):
+    assert dtype.is_compatible_with(x.dtype), 'Expected {} == {}'.format(dtype.name, x.dtype.name)
+
+
+def assert_ndims(x, ndims):
+    assert x.shape.ndims == ndims, 'Expected ndims == {}, got shape {}'.format(ndims, x.shape)
+
+
+def assert_dim(x, x_dim, target):
+    assert_dim_is_specified(x, x_dim)
+    assert int(x.shape[x_dim]) == target, 'Expected {}[{}] == {}'.format(x.shape, x_dim, target)
+
+
+def assert_equal_shape(x, y):
+    assert x.shape == y.shape, 'Expected {} == {}'.format(x.shape, y.shape)
+
+
+def assert_equal_dims(x, x_dim, y, y_dim):
+    assert_dim_is_specified(x, x_dim)
+    assert_dim_is_specified(y, y_dim)
+    assert int(x.shape[x_dim]) == int(y.shape[y_dim]), 'Expected {}[{}] == {}[{}]'.format(
+        x.shape, x_dim, y.shape, y_dim)
+
+
+def assert_shape_is_fully_defined(x):
+    assert x.shape.is_fully_defined(), 'Expected {} to be fully defined'.format(x.shape)
+
+
+def assert_dim_is_specified(x, x_dim):
+    assert x.shape[x_dim] is not None, 'Expected {}-th entry of {} to be specified!'.format(
+        x_dim, x.shape)
+
+
 # Ops --------------------------------------------------------------------------
 
 
