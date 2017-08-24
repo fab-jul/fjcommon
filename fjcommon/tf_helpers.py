@@ -98,6 +98,34 @@ get_variable_zeros = functools.partial(tf.get_variable, initializer=tf.zeros_ini
 get_variable_ones = functools.partial(tf.get_variable, initializer=tf.ones_initializer(), trainable=False)
 
 
+def reverse_every_other_row(inp, batch_axis=0, seq_axis=1):
+    """
+    Given some tensor `input`, reverse every other row of the `batch_axis` in the direction of the `seq_axis`.
+    Example:
+
+        inp = [[1,  2,  3],
+               [4,  5,  6],
+               [7,  8,  9],
+               [10, 11, 12]]
+
+        reverse_every_other_row(inp, 0, 1) ->
+              [[1,  2,  3],
+               [6,  5,  4],   # reversed
+               [7,  8,  9],
+               [12, 11, 10]]  # reversed
+
+    """
+    assert inp.shape.ndims >= max(batch_axis, seq_axis) + 1
+    inp_shape = tf.shape(inp)
+    h, w = inp_shape[batch_axis], inp_shape[seq_axis]
+
+    # Create seq_lengths == [0, w, 0, w, ...], where len(seq_lengths) == h
+    seq_lengths = tf.stack((
+        tf.zeros([h//2 + 1], dtype=tf.int32),
+        tf.fill([h//2 + 1], w)), axis=1)
+    seq_lengths = tf.reshape(seq_lengths, [-1])[:h]  # flatten and trim
+
+    return tf.reverse_sequence(inp, seq_lengths=seq_lengths, seq_dim=seq_axis, batch_axis=batch_axis)
 # Caching ----------------------------------------------------------------------
 
 
