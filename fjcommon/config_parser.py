@@ -54,11 +54,11 @@ _PAT_PARAM = re.compile(r'^([^\s]+?)\s*=\s*(.+)$')
 def parse(config_p):
     """
     Parses a configuration file at `config_p`.
-    :returns tuple (config, rel_path), where rel_path is the relateive path of config to the root config file,
+    :returns tuple (config, rel_path), where rel_path is the relative path of config to the dir of the root config file,
     where thre root config file is the one without a 'use' statement.
     """
     config, root_path = _parse(config_p)
-    rel_path = path.abspath(config_p).replace(path.dirname(root_path), '')
+    rel_path = path.abspath(config_p).replace(path.dirname(root_path), '').strip(path.sep)
     return config, rel_path
 
 
