@@ -5,6 +5,7 @@ import itertools
 import tensorflow as tf
 from os import path
 import os
+import random
 import argparse
 import glob
 from fjcommon import tf_helpers
@@ -41,11 +42,24 @@ def join_created_images_records(out_dir, num_jobs):
         target_p = path.join(out_dir, _records_file_name(base_records_file_name, shard_number))
         os.rename(records_p, target_p)
 
-    list(map(os.removedirs, jobs_dirs))
+    print('Removing empty job dirs...')
+    list(map(os.removedirs, jobs_dirs))  # remove all job dirs, which are now empty
+
+    print('Counting...')
+    all_records_glob = path.join(out_dir, '*.{}'.format(_TF_RECORD_EXT))
+    printing.print_join('{}: {}'.format(path.basename(p), _number_of_examples_in_record(p))
+                        for p in sorted(glob.glob(all_records_glob)))
+
+
+def _number_of_examples_in_record(p):
+    return sum(1 for _ in tf.python_io.tf_record_iterator(p))
 
 
 def _get_image_paths(image_dir):
-    return sorted(glob.glob(path.join(image_dir, '*.png')))
+    """ Shuffled list of all .pngs in `image_dir` """
+    paths = sorted(glob.glob(path.join(image_dir, '*.png')))
+    random.Random(6).shuffle(paths)  # shuffle deterministically, so that the returned list is consistent between jobs
+    return paths
 
 
 def create_records(feature_bytes_it, out_dir, num_per_shard,
