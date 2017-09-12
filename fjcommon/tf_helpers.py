@@ -502,7 +502,20 @@ class ImageSaver(object):
         self.augment_fetch_dict(fetch_dict, output_tensor)
         return fetch_dict
 
-    def save(self, fetched_tensors, img_names, chmod=0o755):
+    def all_exist(self, img_names):
+        for img_name in img_names:
+            img_out_p = self._to_full_path(img_name)
+            if not path.exists(img_out_p):
+                return False
+        return True
+
+    def _to_full_path(self, rel_img_name):
+        img_out_p = path.join(self.img_dir, rel_img_name)
+        if not img_out_p.endswith('.png'):
+            return img_out_p + '.png'
+        return img_out_p
+
+    def save(self, fetched_tensors, img_names, chmod=0o755, exists_ok=True):
         """
         Saves fetched images.
         :param fetched_tensors: Result of a call to session.run(fetches) where previously,
@@ -517,9 +530,9 @@ class ImageSaver(object):
         assert len(img_names) == num_batches
 
         for batch in range(num_batches):
-            img_out_p = path.join(self.img_dir, img_names[batch])
-            if not img_out_p.endswith('.png'):
-                img_out_p += '.png'
+            img_out_p = self._to_full_path(img_names[batch])
+            if not exists_ok and path.exists(img_out_p):
+                raise FileExistsError('Image already exists: {}'.format(img_out_p))
             img_out_b = img_out[batch, ...]
             os.makedirs(path.dirname(img_out_p), exist_ok=True)
             self.save_img(name=img_out_p, arr=img_out_b)
