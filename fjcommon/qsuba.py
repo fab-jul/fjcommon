@@ -7,6 +7,7 @@ This is still very much work in progress!
 import argparse
 import re
 import os
+import sys
 import time
 import glob
 import subprocess
@@ -15,13 +16,15 @@ from contextlib import contextmanager
 
 
 def lift_argument_parser(parser):
-    """ Adds --job_id and --num_jobs to parser. These get used by job_id_iterator. """
+    """ Adds --job_id, --num_jobs and --qsuba_dry_run to parser. These get used by job_id_iterator. """
     try:
         job_id = int(os.environ.get('SGE_TASK_ID', 1))
     except ValueError:
         job_id = 1
     parser.add_argument('--job_id', type=int, default=job_id)
     parser.add_argument('--num_jobs', type=int, default=1)
+    parser.add_argument('--qsuba_dry_run', action='store_const', const=True)
+    parser.add_argument('--qsuba_rerun', type=str)
 
 
 def job_id_iterator(flags):
@@ -42,27 +45,57 @@ def job_id_iterator(flags):
     """
     assert flags.num_jobs >= flags.job_id >= 1
 
-    def _iterator(it):
-        for i, el in enumerate(it):
-            if i % flags.num_jobs != (flags.job_id - 1):  # job_ids start at 1
-                continue
-            yield el
-    return _iterator
+    def _iterator_for_job_id(job_id):
+        if flags.qsuba_rerun:
+            rerun_job_ids = list(map(int, flags.qsuba_rerun.split(',')))
+            if job_id not in rerun_job_ids:
+                print('Skipping job {}, only running {}'.format(job_id, rerun_job_ids))
+                sys.exit(1)
+
+        def _iterator(it):
+            for i, el in enumerate(it):
+                if i % flags.num_jobs != (job_id - 1):  # job_ids start at 1
+                    continue
+                yield el
+        return _iterator
+
+    if flags.qsuba_dry_run:
+        def _dry_run_iterator(it):
+            data = list(it)
+            for job_id in range(flags.num_jobs):
+                print(job_id)
+                print('\n'.join(_iterator_for_job_id(job_id)(data)))
+                print('---')
+            print('--qsuba_dry_run, will exit now')
+            sys.exit(0)
+        return _dry_run_iterator
+
+    return _iterator_for_job_id(flags.job_id)
 
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument('script', type=str)
-    p.add_argument('--num_jobs', type=int, help='If given, this becomes an array job.')
-    p.add_argument('--out_dir', type=str, default='out')
-    p.add_argument('--hours', type=str, default=4)
-    p.add_argument('--gpu', type=bool, default=False)
-    p.add_argument('--skip_tailf', '-q', action='store_const', const=True)
-    p.add_argument('--mem', type=int, default=5)
-    p.add_argument('--num_jobs_flag', type=str, default='--num_jobs')
-    p.add_argument('--interpreter', type=str, default='python -u')
+    p = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    p.add_argument('script', type=str, help='The script to run.')
+    p.add_argument('--num_jobs', type=str,
+                   help='If given, this becomes an array job. '
+                        'If int, submit 1-`num_jobs`. If str, expected to be START_ID-END_ID.')
+    p.add_argument('--out_dir', type=str, default='out', help='Path to directory for  of log files')
+    p.add_argument('--duration', type=str, default='4',
+                   help='If int: hours to run job. If str, expected to be HH:MM:SS.')
+    p.add_argument('--gpu', type=bool, default=False, help='Whether to use gpu')
+    p.add_argument('--skip_tailf', '-q', action='store_const', const=True,
+                   help='If given, do not tail -f relevant log file.')
+    p.add_argument('--mem', type=int, default=5, help='Memory, in GB, to allocate for job.')
+    p.add_argument('--interpreter', type=str, default='python -u',
+                   help='What to put on the line before `script` in the auto-generated run file.')
     p.add_argument('--pre_run_cmds', type=str,
-                   default='source ~/cudarc; source ~/pyenvrc; pyenv activate ma_env_tf1_2')
+                   default='source ~/cudarc; source ~/pyenvrc; pyenv activate ma_env_tf1_2',
+                   help='What to run before `script` when the job starts.')
+    p.add_argument('--dry_run', action='store_const', const=True,
+                   help='Does not create array job. Passes --qsuba_dry_run to job. If job calls job_id_iterator, '
+                        'an info about which job consumes which input is printed and then the job is cancelled.')
+    p.add_argument('--rerun', type=str,
+                   help='Comma separated list of job_ids to run again.')
 
     flags, other_args = p.parse_known_args()
     os.makedirs(flags.out_dir, exist_ok=True)
@@ -71,30 +104,51 @@ def main():
     follow_file = not flags.skip_tailf
     with tmp_run_file(flags.pre_run_cmds, flags.script, flags.interpreter,
                       remove=flags.skip_tailf) as run_file:
-        try:
-            h_rt_flag = 'h_rt={:02d}:00:00'.format(int(flags.hours))
-        except ValueError:  # flags.hours is not int
-            assert ':' in flags.hours
-            h_rt_flag = 'h_rt={}'.format(flags.hours)
+        if _is_int(flags.duration):
+            h_rt_flag = 'h_rt={:02d}:00:00'.format(int(flags.duration))
+        else:
+            assert ':' in flags.duration
+            h_rt_flag = 'h_rt={}'.format(flags.duration)
 
         qsub_call = [
             'qsub',
             '-o', flags.out_dir,
             '-l', h_rt_flag,
             '-l', 'h_vmem={}G'.format(flags.mem),
-            '-l', 'gpu={}'.format(int(flags.gpu)),
             '-cwd', '-j', 'y',
         ]
 
         if flags.num_jobs:
-            qsub_call += ['-t', '1-{}'.format(flags.num_jobs)]
-            other_args += [
-                flags.num_jobs_flag, str(flags.num_jobs)]
+            # Create array job
+            if _is_int(flags.num_jobs):  # just a number given
+                num_jobs = flags.num_jobs
+                job_id_range = '1-{}'.format(num_jobs)
+            else:  # a range given, i.e., 1-30
+                job_id_range = flags.num_jobs
+                start_id, end_id = flags.num_jobs.split('-')  # raises if incorrect str given
+                num_jobs = end_id.split()
+            other_args += ['--num_jobs', num_jobs]
+
+            if flags.rerun:
+                # if rerun, only submit range MIN(rerun) - MAX(rerun) to reduce unnecessary job dispatch
+                rerun_job_ids = list(map(int, flags.rerun.split(',')))
+                job_id_range = '{}-{}'.format(min(rerun_job_ids), max(rerun_job_ids))
+                print('--rerun given, only submitting {}'.format(job_id_range))
+                other_args += ['--qsuba_rerun', flags.rerun]
+
+            if not flags.dry_run:
+                qsub_call += ['-t', job_id_range]
+            else:
+                other_args += ['--qsuba_dry_run']
+
+        if flags.gpu:
+            qsub_call += ['-l', 'gpu=1']
 
         qsub_call += [run_file]
 
         print(' '.join(qsub_call))
         if other_args:
+            print(other_args)
             print('   ' + ' '.join(other_args))
             qsub_call += other_args
 
@@ -111,9 +165,18 @@ def main():
                 ask_for_kill(job_id)
 
 
+def _is_int(v):
+    try:
+        int(v)
+        return True
+    except ValueError:
+        return False
+
+
 @contextmanager
 def tmp_run_file(pre_run_cmds, script_name, interpreter, remove):
     fn = '{}_sub.sh'.format(os.path.splitext(script_name)[0])
+    print(fn)
     if not os.path.exists(fn):
         with open(fn, 'w+') as f:
             f.write('#!/bin/bash\n')
