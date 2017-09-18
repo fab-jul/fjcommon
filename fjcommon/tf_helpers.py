@@ -343,7 +343,13 @@ def log_values(summary_writer, tags_and_values, iteration):
 
 
 class VersionAwareSaver(object):
-    def __init__(self, save_dir):
+    def __init__(self, save_dir, **kwargs_saver):
+        """
+        :param save_dir: where to save data
+        :param kwargs_saver: Passed on to the tf.train.Saver that will be created
+        """
+        assert 'var_list' not in kwargs_saver, 'Not supported'  # TODO: maybe reasonable to support in the future
+
         os.makedirs(save_dir, exist_ok=True)
         self.save_path = path.join(save_dir, 'ckpt')
         self.var_names_fn = path.join(save_dir, 'var_names.pkl')
@@ -364,7 +370,7 @@ class VersionAwareSaver(object):
             var_list = current_vars
             self._set_restorable_var_names([var.name for var in current_vars])
 
-        self.saver = tf.train.Saver(var_list=var_list)
+        self.saver = tf.train.Saver(var_list=var_list, **kwargs_saver)
 
     def save(self, sess, global_step):
         self.saver.save(sess, self.save_path, global_step)
