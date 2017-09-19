@@ -134,7 +134,8 @@ def reverse_every_other_row(inp, batch_axis=0, seq_axis=1):
 # Variable Learning Rates ------------------------------------------------------
 
 
-def create_train_op_with_different_lrs(total_loss, optimizer_default, special_optimizers_and_vars):
+def create_train_op_with_different_lrs(total_loss, optimizer_default, special_optimizers_and_vars,
+                                       summarize_gradients=False):
     """
     :param total_loss: loss to minimize
     :param optimizer_default: optimizer to use for all variables not assigned to one of the special optimizers
@@ -167,7 +168,35 @@ def create_train_op_with_different_lrs(total_loss, optimizer_default, special_op
             optimizer_special.apply_gradients(zip(grads_special, vars_special)))
     assert grads_special_start_idx == len(all_vars_sorted), '{} != {}'.format(grads_special_start_idx, len(all_vars_sorted))
 
+    if summarize_gradients:
+        add_gradients_summaries(zip(grads, all_vars_sorted), histograms=False, excludes=['BatchNorm'])
+
     return tf.group(*train_steps)
+
+
+_GRADIENT_SUMMARY_NAME_SCOPE = 'grads'
+
+
+def add_gradients_summaries(grads_and_vars, histograms=True, norms=True, excludes=None):
+    assert histograms or norms
+    if not excludes:
+        excludes = []
+    with tf.name_scope(_GRADIENT_SUMMARY_NAME_SCOPE):
+        for grad, var in grads_and_vars:
+            if any(exclude in var.op.name for exclude in excludes):
+                continue
+            if grad is not None:
+                if isinstance(grad, tf.IndexedSlices):
+                    grad_values = grad.values
+                else:
+                    grad_values = grad
+                if histograms:
+                    tf.summary.histogram(var.op.name + '/gradient', grad_values)
+                if norms:
+                    tf.summary.scalar(var.op.name + '/gradient_norm', tf.global_norm([grad_values]))
+            else:
+                tf.logging.info('Var {} has no gradient'.format(var.op.name))
+
 
 
 # Caching ----------------------------------------------------------------------
