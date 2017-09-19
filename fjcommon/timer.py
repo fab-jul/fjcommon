@@ -31,3 +31,12 @@ class TimeAccumulator(object):
         count = len(self.times)
         self.times = []
         return total_time_spent / (count + self._EPS)  # prevent div by zero errors
+
+
+@contextmanager
+def execute(name=''):
+    start = time.time()
+    yield
+    duration = time.time() - start
+    print('{}{:.3f}'.format(name + ': ' if name else '', duration))
+
