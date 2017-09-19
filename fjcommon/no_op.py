@@ -1,5 +1,5 @@
 
-class NoOp(object):
+class _NoOp(object):
     """
     Class that silently ignores calls to any function.
     """
@@ -7,5 +7,8 @@ class NoOp(object):
         return _no_op
 
 
+NoOp = _NoOp()
+
+
 def _no_op(*args, **kwargs):
-    return None
+    return NoOp  # return NoOp s.t. NoOp.foo().bar().baz() works.
