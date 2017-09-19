@@ -6,6 +6,7 @@ import functools
 import itertools
 from collections import OrderedDict, namedtuple
 import os
+import re
 import sys
 from os import path
 import pickle
@@ -138,7 +139,8 @@ def create_train_op_with_different_lrs(total_loss, optimizer_default, special_op
                                        summarize_gradients=False):
     """
     :param total_loss: loss to minimize
-    :param optimizer_default: optimizer to use for all variables not assigned to one of the special optimizers
+    :param optimizer_default: optimizer to use for all variables not assigned to one of the special optimizers. Note:
+                this may be None, in which case only special_optimizers_and_vars is used.
     :param special_optimizers_and_vars: list of tuples (Optimizer, [variables]). Note: this also works if
                 len(special_optimizers_and_vars) == 0
     :return: tf.group of training steps
@@ -157,15 +159,22 @@ def create_train_op_with_different_lrs(total_loss, optimizer_default, special_op
     global_step = tf.contrib.slim.get_or_create_global_step()
     grads_special_start_idx = len(trainable_vars_without_special)
     grads_default = grads[:grads_special_start_idx]
-    train_steps = [
-        optimizer_default.apply_gradients(
-            zip(grads_default, trainable_vars_without_special), global_step=global_step)]
+    has_default_optimizer = optimizer_default is not None
+    train_steps = []
+    if has_default_optimizer:
+        train_steps.append(
+            optimizer_default.apply_gradients(
+                zip(grads_default, trainable_vars_without_special),
+                global_step=global_step))
     for optimizer_special, vars_special in special_optimizers_and_vars:
         grads_end_idx = grads_special_start_idx + len(vars_special)
         grads_special = grads[grads_special_start_idx:grads_end_idx]
         grads_special_start_idx = grads_end_idx
         train_steps.append(
-            optimizer_special.apply_gradients(zip(grads_special, vars_special)))
+            optimizer_special.apply_gradients(
+                zip(grads_special, vars_special),
+                # exactly one call to apply_gradients must contain global_step
+                global_step=None if has_default_optimizer else global_step))
     assert grads_special_start_idx == len(all_vars_sorted), '{} != {}'.format(grads_special_start_idx, len(all_vars_sorted))
 
     if summarize_gradients:
@@ -380,7 +389,8 @@ class VersionAwareSaver(object):
         assert 'var_list' not in kwargs_saver, 'Not supported'  # TODO: maybe reasonable to support in the future
 
         os.makedirs(save_dir, exist_ok=True)
-        self.save_path = path.join(save_dir, 'ckpt')
+        self.ckpt_fn = 'ckpt'
+        self.save_path = path.join(save_dir, self.ckpt_fn)
         self.var_names_fn = path.join(save_dir, 'var_names.pkl')
         self.init_unrestored_op = None
 
@@ -404,13 +414,51 @@ class VersionAwareSaver(object):
     def save(self, sess, global_step):
         self.saver.save(sess, self.save_path, global_step)
 
-    def restore(self, sess):
+    def restore(self, sess, restore_itr=-1):
         """ Restores variables and initialized un-restored variables. """
-        latest_ckpt = tf.train.latest_checkpoint(path.dirname(self.save_path))
-        assert latest_ckpt is not None, 'No checkpoints at {}'.format(self.save_path)
-        self.saver.restore(sess, latest_ckpt)
+        ckpt_to_restore = self.get_checkpoint_path(restore_itr)
+        assert ckpt_to_restore is not None
+        tf.logging.info('Restoring {}...'.format(ckpt_to_restore))
+        self.saver.restore(sess, ckpt_to_restore)
         if self.init_unrestored_op is not None:
             sess.run(self.init_unrestored_op)
+
+    def get_checkpoint_path(self, restore_itr):
+        all_ckpts_with_iterations = self.all_ckpts_with_iterations()
+        ckpt_to_restore_idx = -1 if restore_itr == -1 else VersionAwareSaver.index_of_ckpt_with_iter(
+            all_ckpts_with_iterations, restore_itr)
+        _, ckpt_to_restore = all_ckpts_with_iterations[ckpt_to_restore_idx]
+        assert ckpt_to_restore is not None
+        return ckpt_to_restore
+
+    def all_ckpts_with_iterations(self):
+        return sorted(
+            (VersionAwareSaver.iteration_of_checkpoint(ckpt_path), ckpt_path)
+            for ckpt_path in self.all_ckpts())
+
+    @staticmethod
+    def index_of_ckpt_with_iter(ckpts_with_iterations, target_ckpt_itr):
+        """ given a sorted list `ckpts_with_iterations` of (ckpt_iter, ckpt_path), returns the smallest index i in that
+        list where target_ckpt_itr >= ckpt_iter """
+        for i, (ckpt_iter, _) in reversed(list(enumerate(ckpts_with_iterations))):
+            if target_ckpt_itr >= ckpt_iter:
+                return i
+        raise ValueError('*** Cannot find ckpt with iter >= {} in {}'.format(
+            target_ckpt_itr, ckpts_with_iterations))
+
+    @staticmethod
+    def iteration_of_checkpoint(ckpt_path):
+        ckpt_file_name = os.path.basename(ckpt_path)
+        m = re.search(r'-(\d+)', ckpt_file_name)
+        assert m is not None, 'Expected -(\\d+), got {}'.format(ckpt_path)
+        return int(m.group(1))
+
+    def all_ckpts(self):
+        save_dir = path.dirname(self.save_path)
+        return set(
+            os.path.join(save_dir, os.path.splitext(fn)[0])
+            for fn in os.listdir(save_dir)
+            if self.ckpt_fn in fn)
 
     def _get_restorable_var_names(self):
         assert path.exists(self.var_names_fn)
