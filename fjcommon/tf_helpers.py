@@ -135,8 +135,11 @@ def reverse_every_other_row(inp, batch_axis=0, seq_axis=1):
 # Variable Learning Rates ------------------------------------------------------
 
 
+_GRADIENT_SUMMARY_NAME_SCOPE = 'grads'
+
+
 def create_train_op_with_different_lrs(total_loss, optimizer_default, special_optimizers_and_vars,
-                                       summarize_gradients=False):
+                                       summarize_gradients=False, gradient_clipping=None):
     """
     :param total_loss: loss to minimize
     :param optimizer_default: optimizer to use for all variables not assigned to one of the special optimizers. Note:
@@ -155,6 +158,12 @@ def create_train_op_with_different_lrs(total_loss, optimizer_default, special_op
     all_vars_sorted = trainable_vars_without_special + all_vars_special
     with tf.control_dependencies(update_ops):
         grads = tf.gradients(total_loss, all_vars_sorted)
+
+    if gradient_clipping is not None:
+        tf.logging.info('Gradient clipping to global norm {}'.format(gradient_clipping))
+        grads, global_norm = tf.clip_by_global_norm(grads, gradient_clipping)
+        with tf.name_scope(_GRADIENT_SUMMARY_NAME_SCOPE):
+            tf.summary.scalar('global_norm', global_norm)
 
     global_step = tf.contrib.slim.get_or_create_global_step()
     grads_special_start_idx = len(trainable_vars_without_special)
@@ -181,9 +190,6 @@ def create_train_op_with_different_lrs(total_loss, optimizer_default, special_op
         add_gradients_summaries(zip(grads, all_vars_sorted), histograms=False, excludes=['BatchNorm'])
 
     return tf.group(*train_steps)
-
-
-_GRADIENT_SUMMARY_NAME_SCOPE = 'grads'
 
 
 def add_gradients_summaries(grads_and_vars, histograms=True, norms=True, excludes=None):
@@ -418,7 +424,6 @@ class VersionAwareSaver(object):
         """ Restores variables and initialized un-restored variables. """
         ckpt_to_restore = self.get_checkpoint_path(restore_itr)
         assert ckpt_to_restore is not None
-        tf.logging.info('Restoring {}...'.format(ckpt_to_restore))
         self.saver.restore(sess, ckpt_to_restore)
         if self.init_unrestored_op is not None:
             sess.run(self.init_unrestored_op)
