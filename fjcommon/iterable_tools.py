@@ -8,6 +8,25 @@ def chunks(l, num_chunks):
     yield l[(num_chunks - 1) * max_per_chunk:]  # last slice may be shorter
 
 
+def sliced_iter(it, slice_len, allow_smaller_final_slice=True):
+    assert slice_len > 0
+    current_slice = []
+    for el in it:
+        current_slice.append(el)
+        if len(current_slice) == slice_len:
+            yield current_slice
+            current_slice = []
+    if allow_smaller_final_slice and current_slice:
+        yield current_slice
+
+
+def printing_iterator(it, first_n=5):
+    for i, el in enumerate(it):
+        if i < first_n:
+            print(el)
+        yield el
+
+
 def get_element_at(element_idx, it):
     try:
         return it[element_idx]
