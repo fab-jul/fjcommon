@@ -5,6 +5,7 @@ import itertools
 import tensorflow as tf
 from os import path
 import os
+import re
 import random
 import argparse
 import glob
@@ -15,18 +16,27 @@ from fjcommon import iterable_tools
 
 _JOB_SUBDIR_PREFIX = 'job_'
 _TF_RECORD_EXT = 'tfrecord'
-_DEFAULT_FEATURE_KEY = 'M'
+_DEFAULT_FEATURE_KEY = 'M'  # TODO: let this be a parameter
 
 
-def create_images_records_distributed(image_dir, job_id, num_jobs, out_dir, num_per_shard):
+# TODO: let this be a parameter
+_FRAME_ID_REGEX = r'(.*?)(\d{3,})\.png'  # filename, at least 3 digits right before the extension
+
+
+def create_images_records_distributed(image_dir, job_id, num_jobs, out_dir, num_per_shard, num_per_example):
     assert 1 <= job_id <= num_jobs, 'Invalid job_id: {}'.format(job_id)
     assert num_jobs >= 1, 'Invalid num_jobs: {}'.format(num_jobs)
-    image_paths = _get_image_paths(image_dir)
+    image_paths = _get_image_paths(image_dir, shuffle=num_per_example == 1)
     image_paths_per_job = iterable_tools.chunks(image_paths, num_chunks=num_jobs)
     image_paths_current_job = iterable_tools.get_element_at(job_id - 1, image_paths_per_job)
-    img_it = (open(image_path, 'rb').read() for image_path in image_paths_current_job)
+    consecutive_frames_paths = iterate_in_consecutive_frame_tuples(
+        image_paths_current_job, num_consecutive=num_per_example)
+    consecutive_frames_paths = list(iterable_tools.printing_iterator(consecutive_frames_paths))
+    _shuffle_in_place(consecutive_frames_paths)
+    feature_dicts = wrap_frames_in_feature_dicts(consecutive_frames_paths)
+
     out_dir_job = out_dir if num_jobs == 1 else path.join(out_dir, '{}{}'.format(_JOB_SUBDIR_PREFIX, job_id))
-    create_records(img_it, out_dir_job, num_per_shard)
+    create_records_with_feature_dicts(feature_dicts, out_dir_job, num_per_shard)
 
 
 def join_created_images_records(out_dir, num_jobs):
@@ -55,19 +65,67 @@ def _number_of_examples_in_record(p):
     return sum(1 for _ in tf.python_io.tf_record_iterator(p))
 
 
-def _get_image_paths(image_dir):
+def _get_image_paths(image_dir, shuffle):
     """ Shuffled list of all .pngs in `image_dir` """
     paths = sorted(glob.glob(path.join(image_dir, '*.png')))
-    random.Random(6).shuffle(paths)  # shuffle deterministically, so that the returned list is consistent between jobs
+    if shuffle:
+        _shuffle_in_place(paths)
     return paths
 
 
-def create_records(feature_bytes_it, out_dir, num_per_shard,
-                   max_shards=None, file_name='shard', feature_key=_DEFAULT_FEATURE_KEY):
-    def _feature_dicts():
-        for b in feature_bytes_it:
-            yield {feature_key: bytes_feature(b)}
-    return create_records_with_feature_dict(_feature_dicts(), out_dir, num_per_shard, max_shards, file_name)
+def _shuffle_in_place(paths):
+    random.Random(6).shuffle(paths)  # shuffle deterministically, so that the returned list is consistent between jobs
+
+
+def iterate_in_consecutive_frame_tuples(frame_paths, num_consecutive, frame_id_regex=_FRAME_ID_REGEX):
+    pat = re.compile(frame_id_regex)
+
+    def _get_path_base_id(p):
+        m = pat.search(p)
+        if not m:
+            raise ValueError('Regex did not match: {} not in {}'.format(frame_id_regex, p))
+        p_base, p_id = m.group(1, 2)
+        return p_base, p_id
+
+    for image_paths_slice in iterable_tools.sliced_iter(
+            frame_paths, slice_len=num_consecutive, allow_smaller_final_slice=False):
+        # image_paths_slice is a list of paths
+        image_paths_slice_it = iter(image_paths_slice)
+        p0 = next(image_paths_slice_it)
+        p_0_base, p_0_id = _get_path_base_id(p0)
+        p_prev_id = p_0_id
+        for p_cur in image_paths_slice_it:
+            p_cur_base, p_cur_id = _get_path_base_id(p_cur)
+            if p_0_base != p_cur_base or int(p_prev_id) + 1 != int(p_cur_id):
+                tf.logging.info('Non consequtive paths found in {}'.format(image_paths_slice))
+                break
+            p_prev_id = p_cur_id
+        else:  # no-break, i.e., all consequtive
+            yield image_paths_slice
+
+
+def wrap_frames_in_feature_dicts(frame_paths, feature_key=_DEFAULT_FEATURE_KEY):
+    keys = None
+    for frame_paths_slice in frame_paths:
+        if not keys:
+            keys = keys_for_num_frames_per_example(len(frame_paths_slice), feature_key)
+        yield {key: bytes_feature(open(p, 'rb').read()) for key, p in zip(keys, frame_paths_slice)}
+
+
+def keys_for_num_frames_per_example(num_per_ex, feature_key):
+    if num_per_ex > 1:
+        return [feature_key + '_' + str(i) for i in range(num_per_ex)]
+    else:
+        return [feature_key]
+
+
+def features_dict_for_decoding(num_per_ex, feature_key):
+    return {key: tf.FixedLenFeature([], tf.string)
+            for key in keys_for_num_frames_per_example(num_per_ex, feature_key)}
+
+
+def wrap_bytes_in_feature_dicts(feature_bytes_it, feature_key=_DEFAULT_FEATURE_KEY):
+    return ({feature_key: bytes_feature(b)} for b in feature_bytes_it)
 
 
 def bytes_feature(b):
@@ -78,9 +136,9 @@ def int64_feature(i):
     return tf.train.Feature(int64_list=tf.train.Int64List(value=[i]))
 
 
-def create_records_with_feature_dict(feature_dicts, out_dir, num_per_shard, max_shards=None, file_name='shard'):
+def create_records_with_feature_dicts(feature_dicts, out_dir, num_per_shard, max_shards=None, file_name='shard'):
     """
-    :param feature_bytes_it: iterator yielding bytes to encode as features
+    :param feature_dicts: iterator yielding dictionaries with tf.train.Feature as values, to encode as features
     :param out_dir:
     :param num_per_shard:
     :param file_name:
@@ -122,6 +180,13 @@ def feature_to_image(feature):
     return im
 
 
+def features_to_images(features):
+    """ Use case: features_to_img(read_records(..., num_per_ex>1)) """
+    if not isinstance(features, list):  # when read_records(..., num_per_ex==1)
+        features = [features]
+    return tf.stack([feature_to_image(feature) for feature in features], axis=0)
+
+
 def extract_images(records_glob, max_images, out_dir, feature_key=_DEFAULT_FEATURE_KEY):
     tf.logging.set_verbosity(tf.logging.INFO)
     image = feature_to_image(read_records(records_glob, num_epochs=1, shuffle=False, feature_key=feature_key))
@@ -136,10 +201,10 @@ def extract_images(records_glob, max_images, out_dir, feature_key=_DEFAULT_FEATU
             img_saver.save(img_fetcher(), img_names=[img_name])
 
 
-def read_records(records_glob, num_epochs=None, shuffle=True, feature_key=_DEFAULT_FEATURE_KEY):
-    features_dict = {feature_key: tf.FixedLenFeature([], tf.string)}
+def read_records(records_glob, num_epochs=None, shuffle=True, feature_key=_DEFAULT_FEATURE_KEY, num_per_ex=1):
+    features_dict = features_dict_for_decoding(num_per_ex, feature_key)
     features = read_records_with_features_dict(records_glob, features_dict, num_epochs, shuffle)
-    return features[feature_key]
+    return features[feature_key] if num_per_ex == 1 else [features[k] for k in sorted(features.keys())]
 
 
 def read_records_with_features_dict(records_glob, features_dict, num_epochs=None, shuffle=True):
@@ -154,6 +219,18 @@ def read_records_with_features_dict(records_glob, features_dict, num_epochs=None
     return tf.parse_single_example(serialized_example, features=features_dict)
 
 
+def check(records_glob, out_dir, num_imgs_to_save, num_per_ex):
+    features = read_records(records_glob, num_per_ex=num_per_ex)
+    imgs = features_to_images(features)
+    imsaver = tf_helpers.ImageSaver(out_dir)
+    imsaver_fetch = imsaver.get_fetch_dict(imgs)
+    with tf_helpers.start_queues_in_sess() as (sess, _):
+        for run in range(num_imgs_to_save):
+            print('Run {}...'.format(run))
+            imsaver.save(sess.run(imsaver_fetch),
+                         img_names=['{:02d}_{:02d}.png'.format(run, ex) for ex in range(num_per_ex)])
+
+
 def main(args):
     parser = argparse.ArgumentParser()
     mode_subparsers = parser.add_subparsers(dest='mode', title='Mode')
@@ -162,6 +239,7 @@ def main(args):
     parser_make.add_argument('out_dir', type=str)
     parser_make.add_argument('image_dir', type=str)
     parser_make.add_argument('--num_per_shard', type=int, required=True)
+    parser_make.add_argument('--num_per_ex', type=int, default=1)
     # Make image records, distributed ---
     parser_make_dist = mode_subparsers.add_parser('mk_img_recs_dist')
     parser_make_dist.add_argument('out_dir', type=str)
@@ -169,6 +247,7 @@ def main(args):
     parser_make_dist.add_argument('--job_id', type=int, required=True)
     parser_make_dist.add_argument('--num_jobs', type=int, required=True)
     parser_make_dist.add_argument('--num_per_shard', type=int, required=True)
+    parser_make_dist.add_argument('--num_per_ex', type=int, default=1)
     # Join image records ---
     parser_join = mode_subparsers.add_parser('join')
     parser_join.add_argument('out_dir', type=str)
@@ -179,18 +258,26 @@ def main(args):
     parser_extract.add_argument('out_dir', type=str)
     parser_extract.add_argument('max_imgs', type=int)
     parser_extract.add_argument('--feature_key', type=str, default=_DEFAULT_FEATURE_KEY)
+    #
+    parser_check = mode_subparsers.add_parser('check', help='Check records with multiple examples, save images')
+    parser_check.add_argument('records_glob', type=str)
+    parser_check.add_argument('out_dir', type=str)
+    parser_check.add_argument('num_imgs', type=int)
+    parser_check.add_argument('num_per_ex', type=int)
     # ---
     flags = parser.parse_args(args)
     if flags.mode == 'mk_img_recs':
-        create_images_records_distributed(
-            flags.image_dir, job_id=1, num_jobs=1, out_dir=flags.out_dir, num_per_shard=flags.num_per_shard)
+        create_images_records_distributed(flags.image_dir, job_id=1, num_jobs=1, out_dir=flags.out_dir,
+                                          num_per_shard=flags.num_per_shard, num_per_example=flags.num_per_ex)
     elif flags.mode == 'mk_img_recs_dist':
-        create_images_records_distributed(
-            flags.image_dir, flags.job_id, flags.num_jobs, flags.out_dir, flags.num_per_shard)
+        create_images_records_distributed(flags.image_dir, flags.job_id, flags.num_jobs, flags.out_dir,
+                                          flags.num_per_shard, flags.num_per_ex)
     elif flags.mode == 'join':
         join_created_images_records(flags.out_dir, flags.num_jobs)
     elif flags.mode == 'extract':
         extract_images(flags.records_glob, flags.max_imgs, flags.out_dir, flags.feature_key)
+    elif flags.mode == 'check':
+        check(flags.records_glob, flags.out_dir, flags.num_imgs, flags.num_per_ex)
     else:
         parser.print_usage()
 
