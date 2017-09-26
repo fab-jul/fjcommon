@@ -13,6 +13,7 @@ import glob
 import subprocess
 from contextlib import contextmanager
 
+import shutil
 
 
 def lift_argument_parser(parser):
@@ -89,8 +90,8 @@ def main():
     p.add_argument('--interpreter', type=str, default='python -u',
                    help='What to put on the line before `script` in the auto-generated run file.')
     p.add_argument('--pre_run_cmds', type=str,
-                   default='source ~/cudarc; source ~/pyenvrc; pyenv activate ma_env_tf1_2',
-                   help='What to run before `script` when the job starts.')
+                   default=os.environ.get('QSUBA_PRE_RUN_CMDS', ''),
+                   help='Value given by QSUBA_PRE_RUN_CMDS')
     p.add_argument('--dry_run', action='store_const', const=True,
                    help='Does not create array job. Passes --qsuba_dry_run to job. If job calls job_id_iterator, '
                         'an info about which job consumes which input is printed and then the job is cancelled.')
@@ -176,17 +177,32 @@ def _is_int(v):
 @contextmanager
 def tmp_run_file(pre_run_cmds, script_name, interpreter, remove):
     fn = '{}_sub.sh'.format(os.path.splitext(script_name)[0])
+    fn_tmp = '{}_sub_tmp.sh'.format(os.path.splitext(script_name)[0])
     print(fn)
-    if not os.path.exists(fn):
-        with open(fn, 'w+') as f:
-            f.write('#!/bin/bash\n')
-            f.write('uname -n; echo "Job ID: $JOB_ID"; echo "GPU: $SGE_GPU"\n')
-            f.write('{}\n'.format(pre_run_cmds))
-            f.write('CUDA_VISIBLE_DEVICES=$SGE_GPU {} {} "$@"\n'.format(
-                interpreter, script_name))
+    with open(fn_tmp, 'w+') as f:
+        f.write('#!/bin/bash\n')
+        f.write('uname -n; echo "Job ID: $JOB_ID"; echo "GPU: $SGE_GPU"\n')
+        f.write('{}\n'.format(pre_run_cmds))
+        f.write('CUDA_VISIBLE_DEVICES=$SGE_GPU {} {} "$@"\n'.format(
+            interpreter, script_name))
+    overwrite_if_changed(fn, fn_tmp)
     yield fn
     if remove:
         os.remove(fn)
+
+
+def overwrite_if_changed(pold, pnew):
+    with open(pnew, 'r') as fnew:
+        fnew_content = fnew.read()
+    if os.path.exists(pold):
+        with open(pold, 'r') as fold:
+            fold_content = fold.read()
+    else:
+        fold_content = None
+    if fold_content == fnew_content:
+        return
+    shutil.move(pnew, pold)
+
 
 
 def wait_for_output(output_glob):
