@@ -38,5 +38,5 @@ def execute(name=''):
     start = time.time()
     yield
     duration = time.time() - start
-    print('{}{:.3f}'.format(name + ': ' if name else '', duration))
+    print('{}{:.5f}'.format(name + ': ' if name else '', duration))
 

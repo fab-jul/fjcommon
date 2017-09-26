@@ -173,7 +173,6 @@ class _Config(object):  # placeholder object filled with setattr
         return '\n'.join(_lines())
 
 
-
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
