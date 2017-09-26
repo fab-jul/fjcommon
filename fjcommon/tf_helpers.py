@@ -82,6 +82,28 @@ def assert_dim_is_specified(x, x_dim):
 # Ops --------------------------------------------------------------------------
 
 
+def mse_psnr(inp, otp, add_mse_to_total_loss=True):
+    """ NOTE: doesn't matter if inp and otp are NCHW or NHWC, as long as it's the same for both. """
+    with tf.name_scope('mse_psnr'):
+        assert tf.float32.is_compatible_with(inp.dtype) and tf.float32.is_compatible_with(otp.dtype)
+
+        # Calculate MSE using floats for differentiability
+        mse_per_image_float = tf.reduce_mean(tf.square(otp - inp), axis=[1, 2, 3])
+        mse_float = tf.reduce_mean(mse_per_image_float)
+        if add_mse_to_total_loss:
+            tf.losses.add_loss(mse_float)
+
+        # Calculate PSNR using quantized int values, bc that's the real world.
+        # Values are expected to be in 0...255, i.e., uint8, but tf.square does not support uint8's
+        otp_int32, inp_int32 = tf.cast(otp, tf.int32), tf.cast(inp, tf.int32)
+        squared_error_int32 = tf.square(otp_int32 - inp_int32)
+        squared_error_float = tf.to_float(squared_error_int32)
+        mse_per_image = tf.reduce_mean(squared_error_float, axis=[1, 2, 3])
+        psnr_per_image = 10 * log10(255.0 * 255.0 / mse_per_image)
+        psnr = tf.reduce_mean(psnr_per_image)
+        return mse_float, psnr
+
+
 def set_backwards_pass(op, backwards):
     """
     Returns new operation which behaves like `op` in the forward pass but
@@ -383,6 +405,11 @@ def log_values(summary_writer, tags_and_values, iteration):
     summary_writer.add_summary(tf.Summary(value=summary_values), global_step=iteration)
 
 
+def add_scalar_summaries_with_prefix(prefix, summaries):
+    for loss_name, loss_tensor in summaries.items():
+        summary_name = '{}/{}'.format(prefix, loss_name)
+        tf.summary.scalar(summary_name, loss_tensor)
+
 # Saving -----------------------------------------------------------------------
 
 
@@ -628,4 +655,36 @@ class ImageSaver(object):
                 os_ext.chmodr(img_out_p, chmod, upto=path.dirname(self.img_dir))
 
         return img_out
+
+
+
+def random_flip(mat, axis=1, seed=None):
+    """Randomly flip mat horizontally (left to right).
+
+    With a 1 in 2 chance, outputs the contents of `mat` flipped along the
+    axis dimension.  Otherwise output the mat as-is.
+
+    Args:
+      mat: tensor
+      seed: A Python integer. Used to create a random seed. See
+        @{tf.set_random_seed}
+        for behavior.
+
+    Returns:
+      A 3-D tensor of the same type and shape as `mat`.
+    """
+    mat = tf.convert_to_tensor(mat, name='mat')
+    uniform_random = tf.random_uniform([], 0, 1.0, seed=seed)
+    mirror_cond = tf.less(uniform_random, .5)
+    result = tf.cond(mirror_cond,
+                     lambda: tf.reverse(mat, [axis]),
+                     lambda: mat)
+    return result
+
+
+
+
+
+
+
 
