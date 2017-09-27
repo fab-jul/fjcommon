@@ -12,3 +12,20 @@ class TestIterableTools(TestCase):
 
         otp = list(it.sliced_iter(range(5), slice_len=1))
         self.assertEqual(otp, list([[el] for el in range(5)]))
+
+    def test_iter_with_sliding_window(self):
+        opt = list(it.iter_with_sliding_window(range(5), window_size=2))
+        self.assertEqual(opt, [(0, 1), (1, 2), (2, 3), (3, 4)])
+
+        opt = list(it.iter_with_sliding_window(range(5), window_size=3))
+        self.assertEqual(opt, [(0, 1, 2), (1, 2, 3), (2, 3, 4)])
+
+        opt = list(it.iter_with_sliding_window(list(range(5)), window_size=3))
+        self.assertEqual(opt, [(0, 1, 2), (1, 2, 3), (2, 3, 4)])
+
+        opt = list(it.iter_with_sliding_window(list(), window_size=3))
+        self.assertEqual(opt, [])
+
+        opt = list(it.iter_with_sliding_window(range(5), window_size=1))
+        self.assertEqual(opt, [(i,) for i in range(5)])
+

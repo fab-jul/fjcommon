@@ -27,6 +27,20 @@ def printing_iterator(it, first_n=5):
         yield el
 
 
+def iter_with_sliding_window(it, window_size):
+    it = iter(it)
+    current_window = []
+    for el in it:
+        current_window.append(el)
+        if len(current_window) == window_size:
+            yield tuple(current_window)
+            break
+    for el in it:
+        current_window.pop(0)
+        current_window.append(el)
+        yield tuple(current_window)
+
+
 def get_element_at(element_idx, it):
     try:
         return it[element_idx]
