@@ -11,3 +11,10 @@ def chmodr(root, mode, upto=''):
     os.chmod(root, mode)
     chmodr(os.path.dirname(root), mode, upto)
 
+
+def listdir_paths(p):
+    """
+    Like os.listdir, but yield full paths
+    """
+    return (os.path.join(p, sub_dir) for sub_dir in os.listdir(p))
+
