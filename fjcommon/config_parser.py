@@ -132,7 +132,10 @@ def _update_config(config, lines):
         # construct a dict with all attributes of the config plus all constraints. adding the constraints allows
         # us to write param = CONSTRAINT instead of param = 'CONSTRAINT'
         globals_dict = dict(config.__dict__, **{val: val for val in config.all_constraint_values()})
-        var_value = eval(var_value, globals_dict)  # pass current config as globals dict
+        try:
+            var_value = eval(var_value, globals_dict)  # pass current config as globals dict
+        except SyntaxError:
+            raise SyntaxError('Cannot parse line: {}'.format(line))
         config.assert_fullfills_constraint(var_name, var_value)
         setattr(config, var_name, var_value)
     return config
