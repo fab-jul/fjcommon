@@ -509,7 +509,7 @@ class VersionAwareSaver(object):
 def histogram_nd(name, values, L, num_rows=100):
     """
     :param name: name of the histogram variable
-    :param values: tensor of dtype int64. Will do histogram over last dimension (channel dimension).
+    :param values: tensor of dtype int64. Will do histogram over last dimension!
     :param L: number of possible values in `values`.
     :param num_rows: number of rows of the histogram
     :return: (histogram, update_op), where
@@ -520,14 +520,17 @@ def histogram_nd(name, values, L, num_rows=100):
 
     C = values.get_shape().as_list()[-1]
     histogram = get_variable_histogram(name, num_rows, C, L)
+    tf.logging.info('Creating histogram of shape {}...'.format(histogram.shape.as_list()))
+
     histogram_current_idx = get_variable_zeros(name + '_idx', shape=(), dtype=tf.int64)
     histogram_current_idx_inc = tf.assign(histogram_current_idx,
                                           tf.mod(histogram_current_idx + 1, num_rows))
-    # one row of the histogram, (C, L) dimensional
-    histo_slice = _histogram_slice(values, C, L)
+    # one row of the histogram, which is stored at histogram[histogram_current_idx, :, :]
+    histo_slice = _histogram_slice(values, C, L)  # (C, L)
 
     with tf.control_dependencies([histogram_current_idx_inc]):
-        # write histo_slice to the current index in the histogram
+        # same as
+        #   histogram[histogram_current_idx, :, :] = histo_slice
         update_op = tf.scatter_update(histogram, histogram_current_idx, histo_slice)
 
     return histogram, update_op
