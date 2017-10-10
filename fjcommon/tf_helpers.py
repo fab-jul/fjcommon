@@ -455,6 +455,14 @@ class VersionAwareSaver(object):
         if self.init_unrestored_op is not None:
             sess.run(self.init_unrestored_op)
 
+    def restore_all_ckpts_iterator(self, sess):
+        """ Restores one chkpt after the other, yielding the iteration each time """
+        for ckpt_itr, ckpt_path in self.all_ckpts_with_iterations():
+            self.saver.restore(sess, ckpt_path)
+            if self.init_unrestored_op is not None:
+                sess.run(self.init_unrestored_op)
+            yield ckpt_itr
+
     def get_checkpoint_path(self, restore_itr):
         all_ckpts_with_iterations = self.all_ckpts_with_iterations()
         ckpt_to_restore_idx = -1 if restore_itr == -1 else VersionAwareSaver.index_of_ckpt_with_iter(
