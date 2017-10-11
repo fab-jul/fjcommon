@@ -305,10 +305,10 @@ class LoggerOutput(object):
             log_values(filewriter, self.tags_and_values, iteration=itr)
         return self
 
-    def add_to_console(self, itr, avg_time=None):
+    def add_to_console(self, itr, append=''):
         log_str = '{}: {}'.format(itr, self.log_str)
-        if avg_time:
-            log_str += ' (s/step: {:.3f})'.format(avg_time)
+        if append:
+            log_str += ' ' + append
         tf.logging.info(log_str)
         return self
 

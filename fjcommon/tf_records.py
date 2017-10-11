@@ -182,8 +182,7 @@ def feature_to_image(feature):
 
 def features_to_images(features):
     """ Use case: features_to_img(read_records(..., num_per_ex>1)) """
-    if not isinstance(features, list):  # when read_records(..., num_per_ex==1)
-        features = [features]
+    assert isinstance(features, list)
     return tf.stack([feature_to_image(feature) for feature in features], axis=0)
 
 
