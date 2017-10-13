@@ -40,6 +40,7 @@ def central_crop(images_glob, target_w, target_h, append_to_name=''):
 
 def resize(images_glob, target_short_edge, append_to_name='', new_ext=None):
     assert isinstance(target_short_edge, int)
+    assert '.' in new_ext, 'Need . in ext, got {}'.format(new_ext)
     for img_p in _img_ps(images_glob):
         im = _open_image(img_p)
         w, h = im.size
