@@ -38,10 +38,25 @@ def central_crop(images_glob, target_w, target_h, append_to_name=''):
         im_out.save(img_p_out)
 
 
-def resize(images_glob, target_short_edge, append_to_name='', new_ext=None):
+def resize(images_glob, target_short_edge, append_to_name='', new_ext=None, skip_existing=True):
     assert isinstance(target_short_edge, int)
     assert '.' in new_ext, 'Need . in ext, got {}'.format(new_ext)
+    report = []
     for img_p in _img_ps(images_glob):
+        img_p_base, ext = os.path.splitext(img_p)
+        if new_ext:
+            ext = new_ext
+        img_p_out = img_p_base + append_to_name + ext
+
+        if os.path.exists(img_p_out):
+            if skip_existing:
+                print('Already exists: {}, skipping...'.format(img_p_out))
+                continue
+            print('Already exists, --skip_existing not given. Stopping...')
+            return
+
+        print('Resizing {}...'.format(img_p_out))
+
         im = _open_image(img_p)
         w, h = im.size
         h_is_short_edge = h <= w
@@ -58,14 +73,15 @@ def resize(images_glob, target_short_edge, append_to_name='', new_ext=None):
         else:
             new_h, new_w = new_long, new_short
 
-        im_out = im.resize((new_w, new_h), _get_PIL_Image().ANTIALIAS)
+        try:
+            im_out = im.resize((new_w, new_h), _get_PIL_Image().ANTIALIAS)
+            im_out.save(img_p_out)
+        except OSError as e:
+            print('Caught {}, ignoring'.format(e))
+            report.append(e)
 
-        img_p_base, ext = os.path.splitext(img_p)
-        if new_ext:
-            ext = new_ext
-        img_p_out = img_p_base + append_to_name + ext
-        print('Saving {}...'.format(img_p_out))
-        im_out.save(img_p_out)
+    if report:
+        print('\n'.join(report))
 
 
 def sizes_of_images_in(images_glob):
@@ -97,6 +113,7 @@ def main(args):
     resize_ccrop.add_argument('target_short_edge', type=int)
     resize_ccrop.add_argument('--append_name', type=str, default='')
     resize_ccrop.add_argument('--new_ext', type=str, default='')
+    resize_ccrop.add_argument('--skip_existing', action='store_const', const=True)
     # Sizes ---
     parser_ccrop = mode_subparsers.add_parser('sizes')
     parser_ccrop.add_argument('imgs_glob', type=str)
@@ -104,6 +121,6 @@ def main(args):
     if flags.mode == 'central_crop':
         central_crop(flags.imgs_glob, flags.target_w, flags.target_h, flags.append_name)
     if flags.mode == 'resize':
-        resize(flags.imgs_glob, flags.target_short_edge, flags.append_name, flags.new_ext)
+        resize(flags.imgs_glob, flags.target_short_edge, flags.append_name, flags.new_ext, flags.skip_existing)
     elif flags.mode == 'sizes':
         sizes_of_images_in(flags.imgs_glob)
