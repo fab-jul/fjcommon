@@ -24,6 +24,15 @@ def reshape_into_tiles(a, axis, filler_mat=None):
 
 
 def get_idx_slice(axis, i, ndim):
+    """
+    Returns a slice s where
+
+    mat[s] == mat[:, ---, :, i, :, ---, :]
+                  |_______|     |_______|
+                  axis          ndim - axis - 1
+
+    This allows indexing into an arbitrary dimension of an n-dimensional array.
+    """
     idx = [slice(None)] * ndim
     idx[axis] = i
     return idx
