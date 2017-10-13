@@ -4,23 +4,22 @@ import os
 import argparse
 
 
-def _open_image(img_p):
+def _get_PIL_Image():
     try:
         from PIL import Image
-        return Image.open(img_p)
+        return Image
     except ImportError as e:
         print('images.py needs PIL!')
         sys.exit(1)
 
 
+def _open_image(img_p):
+    return _get_PIL_Image().open(img_p)
+
+
 def central_crop(images_glob, target_w, target_h, append_to_name=''):
     assert isinstance(target_w, int) and isinstance(target_h, int)
-    img_ps = glob.glob(images_glob)
-    if len(img_ps) == 0:
-        print('No images at {}'.format(images_glob))
-        return
-
-    for img_p in sorted(img_ps):
+    for img_p in _img_ps(images_glob):
         im = _open_image(img_p)
         w, h = im.size
         if w < target_w or h < target_h:
@@ -30,10 +29,39 @@ def central_crop(images_glob, target_w, target_h, append_to_name=''):
         left = (w - target_w) // 2
         top = (h - target_h) // 2
         right = left + target_w
-        bottom = top + target_w
+        bottom = top + target_h
         im_out = im.crop((left, top, right, bottom))
 
         img_p_base, ext = os.path.splitext(img_p)
+        img_p_out = img_p_base + append_to_name + ext
+        print('Saving {}...'.format(img_p_out))
+        im_out.save(img_p_out)
+
+
+def resize(images_glob, target_short_edge, append_to_name='', new_ext=None):
+    assert isinstance(target_short_edge, int)
+    for img_p in _img_ps(images_glob):
+        im = _open_image(img_p)
+        w, h = im.size
+        h_is_short_edge = h <= w
+
+        short_edge = h if h_is_short_edge else w
+        assert short_edge >= target_short_edge
+        long_edge = w if h_is_short_edge else h
+        ratio = target_short_edge / short_edge
+        new_short = target_short_edge
+        new_long = int(long_edge * ratio)
+
+        if h_is_short_edge:
+            new_h, new_w = new_short, new_long
+        else:
+            new_h, new_w = new_long, new_short
+
+        im_out = im.resize((new_w, new_h), _get_PIL_Image().ANTIALIAS)
+
+        img_p_base, ext = os.path.splitext(img_p)
+        if new_ext:
+            ext = new_ext
         img_p_out = img_p_base + append_to_name + ext
         print('Saving {}...'.format(img_p_out))
         im_out.save(img_p_out)
@@ -45,6 +73,14 @@ def sizes_of_images_in(images_glob):
     print('\n'.join('{}x{}'.format(w, h) for w, h in set(sizes)))
 
 
+def _img_ps(images_glob):
+    img_ps = glob.glob(images_glob)
+    if len(img_ps) == 0:
+        print('No images matching {}'.format(images_glob))
+        return []
+    return sorted(img_ps)
+
+
 def main(args):
     p = argparse.ArgumentParser()
     mode_subparsers = p.add_subparsers(dest='mode', title='Mode')
@@ -54,11 +90,19 @@ def main(args):
     parser_ccrop.add_argument('target_w', type=int)
     parser_ccrop.add_argument('target_h', type=int)
     parser_ccrop.add_argument('--append_name', type=str, default='')
+    # Resize ---
+    resize_ccrop = mode_subparsers.add_parser('resize')
+    resize_ccrop.add_argument('imgs_glob', type=str)
+    resize_ccrop.add_argument('target_short_edge', type=int)
+    resize_ccrop.add_argument('--append_name', type=str, default='')
+    resize_ccrop.add_argument('--new_ext', type=str, default='')
     # Sizes ---
     parser_ccrop = mode_subparsers.add_parser('sizes')
     parser_ccrop.add_argument('imgs_glob', type=str)
     flags = p.parse_args(args)
     if flags.mode == 'central_crop':
         central_crop(flags.imgs_glob, flags.target_w, flags.target_h, flags.append_name)
+    if flags.mode == 'resize':
+        resize(flags.imgs_glob, flags.target_short_edge, flags.append_name, flags.new_ext)
     elif flags.mode == 'sizes':
         sizes_of_images_in(flags.imgs_glob)
