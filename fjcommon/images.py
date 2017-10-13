@@ -81,7 +81,7 @@ def resize(images_glob, target_short_edge, append_to_name='', new_ext=None, skip
             report.append(e)
 
     if report:
-        print('\n'.join(report))
+        print('\n'.join(map(str, report)))
 
 
 def sizes_of_images_in(images_glob):
