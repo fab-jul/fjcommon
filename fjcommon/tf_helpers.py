@@ -524,24 +524,25 @@ def histogram_nd(name, values, L, num_rows=100):
         histogram: tensor of dimension (num_rows, C, L), where C = values.shape[-1]
         update_op: operation to run to update the histogram from the `values` tensor
     """
-    assert tf.int64.is_compatible_with(values.dtype), 'values must be int64, not {}'.format(values.dtype)
+    with tf.name_scope(name, 'histo'):
+        assert tf.int64.is_compatible_with(values.dtype), 'values must be int64, not {}'.format(values.dtype)
 
-    C = values.get_shape().as_list()[-1]
-    histogram = get_variable_histogram(name, num_rows, C, L)
-    tf.logging.info('Creating histogram of shape {}...'.format(histogram.shape.as_list()))
+        C = values.get_shape().as_list()[-1]
+        histogram = get_variable_histogram(name, num_rows, C, L)
+        tf.logging.info('Creating histogram of shape {}...'.format(histogram.shape.as_list()))
 
-    histogram_current_idx = get_variable_zeros(name + '_idx', shape=(), dtype=tf.int64)
-    histogram_current_idx_inc = tf.assign(histogram_current_idx,
-                                          tf.mod(histogram_current_idx + 1, num_rows))
-    # one row of the histogram, which is stored at histogram[histogram_current_idx, :, :]
-    histo_slice = _histogram_slice(values, C, L)  # (C, L)
+        histogram_current_idx = get_variable_zeros(name + '_idx', shape=(), dtype=tf.int64)
+        histogram_current_idx_inc = tf.assign(histogram_current_idx,
+                                              tf.mod(histogram_current_idx + 1, num_rows))
+        # one row of the histogram, which is stored at histogram[histogram_current_idx, :, :]
+        histo_slice = _histogram_slice(values, C, L)  # (C, L)
 
-    with tf.control_dependencies([histogram_current_idx_inc]):
-        # same as
-        #   histogram[histogram_current_idx, :, :] = histo_slice
-        update_op = tf.scatter_update(histogram, histogram_current_idx, histo_slice)
+        with tf.control_dependencies([histogram_current_idx_inc]):
+            # same as
+            #   histogram[histogram_current_idx, :, :] = histo_slice
+            update_op = tf.scatter_update(histogram, histogram_current_idx, histo_slice)
 
-    return histogram, update_op
+        return histogram, update_op
 
 
 def get_variable_histogram(name, num_rows, C, L):
