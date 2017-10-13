@@ -23,6 +23,14 @@ def reshape_into_tiles(a, axis, filler_mat=None):
     ])
 
 
+def is_int(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
 def get_idx_slice(axis, i, ndim):
     """
     Returns a slice s where

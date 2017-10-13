@@ -12,6 +12,7 @@ from os import path
 import pickle
 from fjcommon import lifting
 from fjcommon import os_ext
+from fjcommon.numpy_ext import is_int
 
 
 # Session ----------------------------------------------------------------------
@@ -447,13 +448,28 @@ class VersionAwareSaver(object):
     def save(self, sess, global_step):
         self.saver.save(sess, self.save_path, global_step)
 
+    def iter_ckpts(self, sess, restore_itr_spec):
+        assert isinstance(restore_itr_spec, str)
+        assert self.is_valid_restore_itr_spec(restore_itr_spec)
+        if is_int(restore_itr_spec):
+            ckpt_itr = self.restore(sess, restore_itr_spec)
+            yield from [ckpt_itr]
+        else:
+            yield from self.restore_all_ckpts_iterator(sess)
+
+    @staticmethod
+    def is_valid_restore_itr_spec(restore_itr_spec):
+        if not (is_int(restore_itr_spec) or restore_itr_spec == 'all'):
+            raise ValueError('restore_itr_spec should be either int or "all", got {}'.format(restore_itr_spec))
+
     def restore(self, sess, restore_itr=-1):
         """ Restores variables and initialized un-restored variables. """
-        ckpt_to_restore = self.get_checkpoint_path(restore_itr)
+        ckpt_to_restore_itr, ckpt_to_restore = self.get_checkpoint_path(restore_itr)
         assert ckpt_to_restore is not None
         self.saver.restore(sess, ckpt_to_restore)
         if self.init_unrestored_op is not None:
             sess.run(self.init_unrestored_op)
+        return ckpt_to_restore_itr
 
     def restore_all_ckpts_iterator(self, sess):
         """ Restores one chkpt after the other, yielding the iteration each time """
@@ -467,9 +483,9 @@ class VersionAwareSaver(object):
         all_ckpts_with_iterations = self.all_ckpts_with_iterations()
         ckpt_to_restore_idx = -1 if restore_itr == -1 else VersionAwareSaver.index_of_ckpt_with_iter(
             all_ckpts_with_iterations, restore_itr)
-        _, ckpt_to_restore = all_ckpts_with_iterations[ckpt_to_restore_idx]
+        ckpt_to_restore_itr, ckpt_to_restore = all_ckpts_with_iterations[ckpt_to_restore_idx]
         assert ckpt_to_restore is not None
-        return ckpt_to_restore
+        return ckpt_to_restore_itr, ckpt_to_restore
 
     def all_ckpts_with_iterations(self):
         return sorted(
