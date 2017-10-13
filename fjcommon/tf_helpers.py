@@ -450,17 +450,16 @@ class VersionAwareSaver(object):
 
     def iter_ckpts(self, sess, restore_itr_spec):
         assert isinstance(restore_itr_spec, str)
-        assert self.is_valid_restore_itr_spec(restore_itr_spec)
         if is_int(restore_itr_spec):
             ckpt_itr = self.restore(sess, restore_itr_spec)
             yield from [ckpt_itr]
-        else:
+        elif restore_itr_spec == 'all':
             yield from self.restore_all_ckpts_iterator(sess)
+        else:
+            raise ValueError('restore_itr_spec should be either int or "all", got {}'.format(restore_itr_spec))
 
     @staticmethod
-    def is_valid_restore_itr_spec(restore_itr_spec):
-        if not (is_int(restore_itr_spec) or restore_itr_spec == 'all'):
-            raise ValueError('restore_itr_spec should be either int or "all", got {}'.format(restore_itr_spec))
+    def i_check_s_valid_restore_itr_spec(restore_itr_spec):
 
     def restore(self, sess, restore_itr=-1):
         """ Restores variables and initialized un-restored variables. """
