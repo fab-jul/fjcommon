@@ -16,3 +16,7 @@ def compose(*args):
 
     return functools.reduce(compose2, args)
 
+
+def identity(*args):
+    return args
+
