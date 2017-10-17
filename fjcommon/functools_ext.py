@@ -18,5 +18,9 @@ def compose(*args):
 
 
 def identity(*args):
+    if len(args) == 0:
+        return None
+    if len(args) == 1:
+        return args[0]
     return args
 
