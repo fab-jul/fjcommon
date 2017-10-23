@@ -381,7 +381,7 @@ class Logger(object):
     def _get_log_str_and_values(self, fetched, joiner):
         formatted_strs = []
         log_tags_and_values = []
-        for name, fetched in fetched.items():
+        for name, fetched in sorted(fetched.items()):
             loggable = self._loggables[name]
             fetched_val = loggable.to_value(fetched)
             if loggable.add_summary:
