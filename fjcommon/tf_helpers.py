@@ -415,6 +415,8 @@ def add_scalar_summaries_with_prefix(prefix, summaries):
 
 
 class VersionAwareSaver(object):
+    _CKPT_FN = 'ckpt'
+
     def __init__(self, save_dir, **kwargs_saver):
         """
         :param save_dir: where to save data
@@ -423,8 +425,7 @@ class VersionAwareSaver(object):
         assert 'var_list' not in kwargs_saver, 'Not supported'  # TODO: maybe reasonable to support in the future
 
         os.makedirs(save_dir, exist_ok=True)
-        self.ckpt_fn = 'ckpt'
-        self.save_path = path.join(save_dir, self.ckpt_fn)
+        self.save_path = path.join(save_dir, VersionAwareSaver._CKPT_FN)
         self.var_names_fn = path.join(save_dir, 'var_names.pkl')
         self.init_unrestored_op = None
 
@@ -486,7 +487,7 @@ class VersionAwareSaver(object):
     def all_ckpts_with_iterations(self):
         return sorted(
             (VersionAwareSaver.iteration_of_checkpoint(ckpt_path), ckpt_path)
-            for ckpt_path in self.all_ckpts())
+            for ckpt_path in self.all_ckpts_in(self.save_path))
 
     @staticmethod
     def index_of_ckpt_with_iter(ckpts_with_iterations, target_ckpt_itr):
@@ -505,12 +506,13 @@ class VersionAwareSaver(object):
         assert m is not None, 'Expected -(\\d+), got {}'.format(ckpt_path)
         return int(m.group(1))
 
-    def all_ckpts(self):
-        save_dir = path.dirname(self.save_path)
+    @staticmethod
+    def all_ckpts_in(save_path):
+        save_dir = path.dirname(save_path)
         return set(
             os.path.join(save_dir, os.path.splitext(fn)[0])
             for fn in os.listdir(save_dir)
-            if self.ckpt_fn in fn)
+            if VersionAwareSaver._CKPT_FN in fn)
 
     def _get_restorable_var_names(self):
         assert path.exists(self.var_names_fn)
