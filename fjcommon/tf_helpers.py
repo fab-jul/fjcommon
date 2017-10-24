@@ -485,9 +485,10 @@ class VersionAwareSaver(object):
         return ckpt_to_restore_itr, ckpt_to_restore
 
     def all_ckpts_with_iterations(self):
+        save_dir = path.dirname(self.save_path)
         return sorted(
             (VersionAwareSaver.iteration_of_checkpoint(ckpt_path), ckpt_path)
-            for ckpt_path in self.all_ckpts_in(self.save_path))
+            for ckpt_path in self.all_ckpts_in(save_dir))
 
     @staticmethod
     def index_of_ckpt_with_iter(ckpts_with_iterations, target_ckpt_itr):
@@ -507,8 +508,7 @@ class VersionAwareSaver(object):
         return int(m.group(1))
 
     @staticmethod
-    def all_ckpts_in(save_path):
-        save_dir = path.dirname(save_path)
+    def all_ckpts_in(save_dir):
         return set(
             os.path.join(save_dir, os.path.splitext(fn)[0])
             for fn in os.listdir(save_dir)
