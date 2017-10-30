@@ -8,6 +8,17 @@ def chunks(l, num_chunks):
     yield l[(num_chunks - 1) * max_per_chunk:]  # last slice may be shorter
 
 
+def flag_first_iter(it):
+    it = iter(it)
+    try:
+        first_el = next(it)
+        yield True, first_el
+    except StopIteration:
+        return
+    for el in it:
+        yield False, el
+
+
 def sliced_iter(it, slice_len, allow_smaller_final_slice=True):
     assert slice_len > 0
     current_slice = []
