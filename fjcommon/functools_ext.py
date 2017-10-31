@@ -17,6 +17,14 @@ def compose(*args):
     return functools.reduce(compose2, args)
 
 
+def fst(t):
+    return t[0]
+
+
+def snd(t):
+    return t[1]
+
+
 def identity(*args):
     if len(args) == 0:
         return None
