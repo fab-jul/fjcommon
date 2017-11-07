@@ -17,6 +17,10 @@ def compose(*args):
     return functools.reduce(compose2, args)
 
 
+def unzip(gen):
+    return zip(*list(gen))
+
+
 def fst(t):
     return t[0]
 

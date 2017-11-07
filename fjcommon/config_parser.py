@@ -176,11 +176,24 @@ class _Config(object):  # placeholder object filled with setattr
         return '\n'.join(_lines())
 
 
+def compare(c1, c2):
+    print('Comparing {}, {}'.format(os.path.basename(c1), os.path.basename(c2)))
+
+    c1, _ = parse(c1)
+    c2, _ = parse(c2)
+
+    for k, v1 in c1.all_params_and_values():
+        v2 = c2.__dict__[k]
+        if v2 != v1:
+            print('{}: {} != {}'.format(k, v1, v2))
+
+
 if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('grid_spec', type=str, help='Path or inline JSON')
-    parser.add_argument('base_config_p', type=str)
-    parser.add_argument('outdir', type=str)
-    flags = parser.parse_args()
-    _gen_grid_search_configs(flags.grid_spec, flags.base_config_p, flags.outdir)
+    compare(sys.argv[1], sys.argv[2])
+#    import argparse
+#    parser = argparse.ArgumentParser()
+#    parser.add_argument('grid_spec', type=str, help='Path or inline JSON')
+#    parser.add_argument('base_config_p', type=str)
+#    parser.add_argument('outdir', type=str)
+#    flags = parser.parse_args()
+#    _gen_grid_search_configs(flags.grid_spec, flags.base_config_p, flags.outdir)

@@ -81,6 +81,7 @@ def main():
                    help='If given, this becomes an array job. '
                         'If int, submit 1-`num_jobs`. If str, expected to be START_ID-END_ID.')
     p.add_argument('--out_dir', type=str, default='out', help='Path to directory for  of log files')
+    p.add_argument('--hosts', type=str, help='Passed to qsub as -l h= flag')
     p.add_argument('--duration', type=str, default='4',
                    help='If int: hours to run job. If str, expected to be HH:MM:SS.')
     p.add_argument('--gpu', type=bool, default=False, help='Whether to use gpu')
@@ -118,6 +119,8 @@ def main():
             '-l', 'h_vmem={}G'.format(flags.mem),
             '-cwd', '-j', 'y',
         ]
+        if flags.hosts:
+            qsub_call += ['-l', 'h={}'.format(flags.hosts)]
 
         if flags.num_jobs:
             # Create array job
