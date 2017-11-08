@@ -437,6 +437,7 @@ class VersionAwareSaver(object):
             # TODO: THIS is just a temporary hack
             skip_restore = kwargs_saver.get('skip_var_name', None)
             if skip_restore:
+                del kwargs_saver['skip_var_name']
                 print('BEFORE: {}'.format(len(var_list)))
                 var_list = [var for var in var_list if skip_restore not in var]
                 print('AFTER: {}'.format(len(var_list)))
