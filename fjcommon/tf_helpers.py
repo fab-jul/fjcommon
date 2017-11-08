@@ -434,6 +434,12 @@ class VersionAwareSaver(object):
         if path.exists(self.var_names_fn):
             restorable_var_names = self._get_restorable_var_names()
             var_list = [var for var in current_vars if var.name in restorable_var_names]
+            # TODO: THIS is just a temporary hack
+            skip_restore = kwargs_saver.get('skip_var_name', None)
+            if skip_restore:
+                print('BEFORE: {}'.format(len(var_list)))
+                var_list = [var for var in var_list if skip_restore not in var]
+                print('AFTER: {}'.format(len(var_list)))
             if len(var_list) != len(current_vars):
                 tf.logging.warn('Graph holds {} variables, restoring {}...'.format(len(current_vars), len(var_list)))
                 unrestored = [var for var in current_vars if var.name not in restorable_var_names]
@@ -478,6 +484,8 @@ class VersionAwareSaver(object):
 
     def get_checkpoint_path(self, restore_itr):
         all_ckpts_with_iterations = self.all_ckpts_with_iterations()
+        if len(all_ckpts_with_iterations) == 0:
+            raise ValueError('No checkpoints found in {}'.format(self.save_path))
         ckpt_to_restore_idx = -1 if restore_itr == -1 else VersionAwareSaver.index_of_ckpt_with_iter(
             all_ckpts_with_iterations, restore_itr)
         ckpt_to_restore_itr, ckpt_to_restore = all_ckpts_with_iterations[ckpt_to_restore_idx]
