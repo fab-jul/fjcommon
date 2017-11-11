@@ -417,7 +417,7 @@ def add_scalar_summaries_with_prefix(prefix, summaries):
 class VersionAwareSaver(object):
     _CKPT_FN = 'ckpt'
 
-    def __init__(self, save_dir, skip_vars, **kwargs_saver):
+    def __init__(self, save_dir, skip_vars=None, **kwargs_saver):
         """
         :param save_dir: where to save data
         :param kwargs_saver: Passed on to the tf.train.Saver that will be created
