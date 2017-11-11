@@ -39,6 +39,11 @@ def create_images_records_distributed(image_dir, job_id, num_jobs, out_dir, num_
     create_records_with_feature_dicts(feature_dicts, out_dir_job, num_per_shard)
 
 
+def foo():
+    yield {key: bytes_feature(open(p, 'rb').read()) for key, p in zip(keys, frame_paths_slice)}
+    create_records_with_feature_dicts()
+
+
 def join_created_images_records(out_dir, num_jobs):
     jobs_dirs_glob = path.join(out_dir, '{}*'.format(_JOB_SUBDIR_PREFIX))
     jobs_dirs = glob.glob(jobs_dirs_glob)
