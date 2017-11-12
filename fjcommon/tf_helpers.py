@@ -445,7 +445,7 @@ class VersionAwareSaver(object):
             self._set_restorable_var_names([var.name for var in current_vars])
 
         if skip_vars:
-            var_list = [var for var in var_list if var not in skip_vars]
+            var_list = [var for var in var_list if var.name not in skip_vars]
         self.saver = tf.train.Saver(var_list=var_list, **kwargs_saver)
 
     def save(self, sess, global_step):
