@@ -417,35 +417,37 @@ def add_scalar_summaries_with_prefix(prefix, summaries):
 class VersionAwareSaver(object):
     _CKPT_FN = 'ckpt'
 
-    def __init__(self, save_dir, skip_vars=None, **kwargs_saver):
+    def __init__(self, save_dir, **kwargs_saver):
         """
         :param save_dir: where to save data
         :param kwargs_saver: Passed on to the tf.train.Saver that will be created
         """
-        assert 'var_list' not in kwargs_saver, 'Not supported'  # TODO: maybe reasonable to support in the future
-
         os.makedirs(save_dir, exist_ok=True)
         self.save_path = path.join(save_dir, VersionAwareSaver._CKPT_FN)
         self.var_names_fn = path.join(save_dir, 'var_names.pkl')
         self.init_unrestored_op = None
 
+        var_list = kwargs_saver.get('var_list', None)
+
         current_vars = (tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES) +
                         tf.get_collection(tf.GraphKeys.SAVEABLE_OBJECTS))
-        if path.exists(self.var_names_fn):
-            restorable_var_names = self._get_restorable_var_names()
-            var_list = [var for var in current_vars if var.name in restorable_var_names]
-            if len(var_list) != len(current_vars):
-                tf.logging.warn('Graph holds {} variables, restoring {}...'.format(len(current_vars), len(var_list)))
-                unrestored = [var for var in current_vars if var.name not in restorable_var_names]
-                if unrestored:
-                    tf.logging.warn('Not restored: {}'.format(unrestored))
-                    self.init_unrestored_op = tf.variables_initializer(unrestored)
+        if var_list is None:
+            if path.exists(self.var_names_fn):
+                restorable_var_names = self._get_restorable_var_names()
+                var_list = [var for var in current_vars if var.name in restorable_var_names]
+                if len(var_list) != len(current_vars):
+                    tf.logging.warn('Graph holds {} variables, restoring {}...'.format(len(current_vars), len(var_list)))
+                    unrestored = [var for var in current_vars if var.name not in restorable_var_names]
+                    if unrestored:
+                        tf.logging.warn('Not restored: {}'.format(unrestored))
+                        self.init_unrestored_op = tf.variables_initializer(unrestored)
+            else:
+                var_list = current_vars
+                self._set_restorable_var_names([var.name for var in current_vars])
         else:
-            var_list = current_vars
-            self._set_restorable_var_names([var.name for var in current_vars])
-
-        if skip_vars:
-            var_list = [var for var in var_list if var.name not in skip_vars]
+            #var_list_names = [var.name for var in var_list]
+            self.init_unrestored_op = tf.variables_initializer(
+                [var for var in current_vars if var in var_list])
         self.saver = tf.train.Saver(var_list=var_list, **kwargs_saver)
 
     def save(self, sess, global_step):
