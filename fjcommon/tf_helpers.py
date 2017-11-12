@@ -445,6 +445,7 @@ class VersionAwareSaver(object):
                 var_list = current_vars
                 self._set_restorable_var_names([var.name for var in current_vars])
         else:
+            del kwargs_saver['var_list']
             #var_list_names = [var.name for var in var_list]
             self.init_unrestored_op = tf.variables_initializer(
                 [var for var in current_vars if var in var_list])
