@@ -1,3 +1,5 @@
+import glob
+
 import tensorflow as tf
 import numpy as np
 
@@ -153,6 +155,14 @@ def reverse_every_other_row(inp, batch_axis=0, seq_axis=1):
     seq_lengths = tf.reshape(seq_lengths, [-1])[:h]  # flatten and trim
 
     return tf.reverse_sequence(inp, seq_lengths=seq_lengths, seq_dim=seq_axis, batch_axis=batch_axis)
+
+
+# Helpers ----------------------------------------------------------------------
+
+
+def list_without_None(*args):
+    """ Basically list(filter(None, args)) but this wouldn't work for tensors because they cannot compare to None. """
+    return [arg for arg in args if arg is not None]
 
 
 # Variable Learning Rates ------------------------------------------------------
@@ -414,6 +424,28 @@ def add_scalar_summaries_with_prefix(prefix, summaries):
 # Saving -----------------------------------------------------------------------
 
 
+def clean_checkpoints(ckpt_dirs, always_keep=None):
+    if '-q' in ckpt_dirs:
+        quiet = True
+        ckpt_dirs.remove('-q')
+    else:
+        quiet = False
+    if not always_keep:
+        always_keep = []
+    for ckpt_dir in sorted(ckpt_dirs):
+        if any(always_keep_el in ckpt_dir for always_keep_el in always_keep):
+            continue
+        all_ckpts = VersionAwareSaver.all_ckpts_with_iterations(ckpt_dir)
+        for _, ckpt_file_base in all_ckpts[:-1]:
+            related_files = glob.glob(ckpt_file_base + '.*')
+            assert 1 <= len(related_files) <= 3, related_files
+            for f in related_files:
+                if quiet:
+                    print(f)
+                else:
+                    os.remove(f)
+
+
 class VersionAwareSaver(object):
     _CKPT_FN = 'ckpt'
 
@@ -423,7 +455,8 @@ class VersionAwareSaver(object):
         :param kwargs_saver: Passed on to the tf.train.Saver that will be created
         """
         os.makedirs(save_dir, exist_ok=True)
-        self.save_path = path.join(save_dir, VersionAwareSaver._CKPT_FN)
+        self.save_dir = save_dir
+        self.ckpt_base_file_path = path.join(save_dir, VersionAwareSaver._CKPT_FN)
         self.var_names_fn = path.join(save_dir, 'var_names.pkl')
         self.init_unrestored_op = None
 
@@ -454,7 +487,7 @@ class VersionAwareSaver(object):
         self.saver = tf.train.Saver(var_list=var_list, **kwargs_saver)
 
     def save(self, sess, global_step):
-        self.saver.save(sess, self.save_path, global_step)
+        self.saver.save(sess, self.ckpt_base_file_path, global_step)
 
     def iter_ckpts(self, sess, restore_itr_spec):
         assert isinstance(restore_itr_spec, str)
@@ -477,25 +510,25 @@ class VersionAwareSaver(object):
 
     def restore_all_ckpts_iterator(self, sess):
         """ Restores one chkpt after the other, yielding the iteration each time """
-        for ckpt_itr, ckpt_path in self.all_ckpts_with_iterations():
+        for ckpt_itr, ckpt_path in VersionAwareSaver.all_ckpts_with_iterations(self.save_dir):
             self.saver.restore(sess, ckpt_path)
             if self.init_unrestored_op is not None:
                 sess.run(self.init_unrestored_op)
             yield ckpt_itr
 
     def get_checkpoint_path(self, restore_itr):
-        all_ckpts_with_iterations = self.all_ckpts_with_iterations()
+        all_ckpts_with_iterations = VersionAwareSaver.all_ckpts_with_iterations(self.save_dir)
         ckpt_to_restore_idx = -1 if restore_itr == -1 else VersionAwareSaver.index_of_ckpt_with_iter(
             all_ckpts_with_iterations, restore_itr)
         ckpt_to_restore_itr, ckpt_to_restore = all_ckpts_with_iterations[ckpt_to_restore_idx]
         assert ckpt_to_restore is not None
         return ckpt_to_restore_itr, ckpt_to_restore
 
-    def all_ckpts_with_iterations(self):
-        save_dir = path.dirname(self.save_path)
+    @staticmethod
+    def all_ckpts_with_iterations(save_dir):
         return sorted(
             (VersionAwareSaver.iteration_of_checkpoint(ckpt_path), ckpt_path)
-            for ckpt_path in self.all_ckpts_in(save_dir))
+            for ckpt_path in VersionAwareSaver.all_ckpts_in(save_dir))
 
     @staticmethod
     def index_of_ckpt_with_iter(ckpts_with_iterations, target_ckpt_itr):
@@ -715,7 +748,8 @@ def random_flip(mat, axis=1, seed=None):
     return result
 
 
-
+if __name__ == '__main__':
+    clean_checkpoints(sys.argv[1:])
 
 
 
