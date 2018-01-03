@@ -85,6 +85,14 @@ def assert_dim_is_specified(x, x_dim):
 # Ops --------------------------------------------------------------------------
 
 
+def transpose_NCHW_to_NHWC(t):
+    return tf.transpose(t, (0, 2, 3, 1), name='to_NHWC')
+
+
+def transpose_NHWC_to_NCHW(t):
+    return tf.transpose(t, (0, 3, 1, 2), name='to_NCHW')
+
+
 def mse_psnr(inp, otp, add_mse_to_total_loss=True):
     """ NOTE: doesn't matter if inp and otp are NCHW or NHWC, as long as it's the same for both. """
     with tf.name_scope('mse_psnr'):
