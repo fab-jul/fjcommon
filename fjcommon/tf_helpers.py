@@ -432,7 +432,14 @@ def add_scalar_summaries_with_prefix(prefix, summaries):
 # Saving -----------------------------------------------------------------------
 
 
+def all_saveable_objects(scope=None):
+    """ Copied private function in TF source. This is what tf.train.Saver saves if var_list=None is passed. """
+    return (tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope) +
+            tf.get_collection(tf.GraphKeys.SAVEABLE_OBJECTS, scope))
+
+
 def clean_checkpoints(ckpt_dirs, always_keep=None):
+
     if '-q' in ckpt_dirs:
         quiet = True
         ckpt_dirs.remove('-q')
