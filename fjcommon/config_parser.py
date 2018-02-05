@@ -95,7 +95,7 @@ def _parse_grid_spec(grid_spec_p):
     try:
         return json.loads(grid_spec_p)
     except json.JSONDecodeError as e:
-        print('Neither valid path, or valid JSON: {}\n{}'.format(grid_spec_p, e))
+        print('Neither valid path, nor valid JSON: {}\n{}'.format(grid_spec_p, e))
         sys.exit(1)
 
 
@@ -189,11 +189,11 @@ def compare(c1, c2):
 
 
 if __name__ == '__main__':
-    compare(sys.argv[1], sys.argv[2])
-#    import argparse
-#    parser = argparse.ArgumentParser()
-#    parser.add_argument('grid_spec', type=str, help='Path or inline JSON')
-#    parser.add_argument('base_config_p', type=str)
-#    parser.add_argument('outdir', type=str)
-#    flags = parser.parse_args()
-#    _gen_grid_search_configs(flags.grid_spec, flags.base_config_p, flags.outdir)
+    # compare(sys.argv[1], sys.argv[2])
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('grid_spec', type=str, help='Path or inline JSON')
+    parser.add_argument('base_config_p', type=str)
+    parser.add_argument('outdir', type=str)
+    flags = parser.parse_args()
+    _gen_grid_search_configs(flags.grid_spec, flags.base_config_p, flags.outdir)
