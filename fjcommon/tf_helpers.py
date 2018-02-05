@@ -254,6 +254,28 @@ def add_gradients_summaries(grads_and_vars, histograms=True, norms=True, exclude
                 tf.logging.info('Var {} has no gradient'.format(var.op.name))
 
 
+# Mutable Variables ------------------------------------------------------------
+
+class MutableVar(object):
+    """
+    Behaves like a normal tf.Variable but sets up setter using a placeholder
+    """
+    def __init__(self, name, shape, dtype, initializer, allowed_range=None):
+        self.allowed_range = allowed_range
+        self._var = tf.get_variable(
+                name, shape=shape, dtype=dtype, initializer=initializer, trainable=False)
+        self._var_setter_ph = tf.placeholder(dtype, shape, name=name + '_ph')
+        self._var_setter = tf.assign(self._var, self._var_setter_ph, validate_shape=True)
+
+    def set(self, sess, new_value):
+        if self.allowed_range:
+            allowed_min, allowed_max = self.allowed_range
+            assert allowed_min <= new_value <= allowed_max, 'Not in range: {}, {}'.format(new_value, self.allowed_range)
+        sess.run(self._var_setter, {self._var_setter_ph: new_value})
+
+    def get(self):  # -> Tensor
+        return self._var
+
 
 # Caching ----------------------------------------------------------------------
 
