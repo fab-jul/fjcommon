@@ -21,66 +21,6 @@ import shutil
 _QSUBA_GIT_REF = 'QSUBA_GIT_REF'
 
 
-def lift_argument_parser(parser):
-    """ Adds --job_id, --num_jobs and --qsuba_dry_run to parser. These get used by job_id_iterator. """
-    try:
-        job_id = int(os.environ.get('SGE_TASK_ID', 1))
-    except ValueError:
-        job_id = 1
-    parser.add_argument('--job_id', type=int, default=job_id)
-    parser.add_argument('--num_jobs', type=int, default=1)
-    parser.add_argument('--qsuba_dry_run', action='store_const', const=True)
-    parser.add_argument('--qsuba_rerun', type=str)
-
-
-def job_id_iterator(flags):
-    """ Given flags returned by a argparse.ArgumentParser's parse_args() method, where the parser was previously
-    lifted with lift_argument_parser, this method return an a function that takes an iterator and returns a new
-    iterator which only yields elements that should be processed by the current job.
-
-    Usage:
-
-    p = argparse.ArgumentParser()
-    ... add arguments
-    qsuba.lift_argument_parser(p)
-    flags = p.parse_args()
-    it = qsuba.job_id_iterator(flags)
-
-    for el in it(element_generator()):
-        # process el
-    """
-    assert flags.num_jobs >= flags.job_id >= 1
-
-    def _iterator_for_job_id(job_id):
-        if flags.qsuba_rerun:
-            rerun_job_ids = list(map(int, flags.qsuba_rerun.split(',')))
-            if job_id not in rerun_job_ids:
-                print('Skipping job {}, only running {}'.format(job_id, rerun_job_ids))
-                sys.exit(1)
-
-        def _iterator(it):
-            for i, el in enumerate(it):
-                if i % flags.num_jobs != (job_id - 1):  # job_ids start at 1
-                    continue
-                yield el
-
-        return _iterator
-
-    if flags.qsuba_dry_run:
-        def _dry_run_iterator(it):
-            data = list(it)
-            for job_id in range(flags.num_jobs):
-                print(job_id)
-                print('\n'.join(_iterator_for_job_id(job_id)(data)))
-                print('---')
-            print('--qsuba_dry_run, will exit now')
-            sys.exit(0)
-
-        return _dry_run_iterator
-
-    return _iterator_for_job_id(flags.job_id)
-
-
 GitManager = namedtuple('GitManager', ['git_root_dir', 'git_url', 'git_checkout', 'qsuba_git_helper_path'])
 
 
@@ -95,6 +35,9 @@ def main():
                    help='If given, this becomes an array job. '
                         'If int, submit 1-`num_jobs`. If str, expected to be START_ID-END_ID.')
     p.add_argument('--out_dir', type=str, default='out', help='Path to directory for  of log files')
+    p.add_argument('--log_file', type=str, default='qsuba_log',
+                   help='Path to file where submission log is stored. Submission log: job_id followed by all '
+                        'arguments.')
     p.add_argument('--hosts', type=str, help='Passed to qsub as -l h= flag')
     p.add_argument('--duration', type=str, default='4',
                    help='If int: hours to run job. If str, expected to be HH:MM:SS.')
@@ -213,6 +156,9 @@ def run(flags, other_args):
         print(otp)
         job_id = re.search(r'(\d+)(\.|\s)', otp).group(1)  # match (1234).1 if array job, else (1234)
 
+        if flags.log_file:
+            log_submission(flags.log_file, job_id, qsub_call)
+
         if follow_file:
             output_glob = os.path.join(flags.out_dir, '*{}*'.format(job_id))
             try:
@@ -325,6 +271,131 @@ def ask_for_kill(job_id):
         return
     if input('Kill job? (y/n)') == 'y':
         subprocess.call(['qdel', job_id])
+
+
+def log_submission(log_file, job_id, qsub_cmd):
+    log_file_lock_p = get_log_file_lock_p(log_file)
+
+    log = '{}\n{}\n{}\n'.format(job_id, pretty_print_call(qsub_cmd), '-' * 80)
+
+    with fasteners.InterProcessLock(log_file_lock_p):
+        with open(log_file, 'a') as f:
+            f.write(log)
+
+
+def get_log_file_lock_p(log_file):
+    assert not log_file.endswith(os.path.sep)
+    log_file_dir, log_file_name = os.path.split(log_file)
+    log_file_lock_fn = '.{}_lock'.format(log_file_name)
+    return os.path.join(log_file_dir, log_file_lock_fn)
+
+
+def pretty_print_call(call):
+    joined_args_call = _join_args(call, nargs={'omg': 2})
+    return _join_lines(joined_args_call, max_len=80)
+
+
+def _join_args(call, nargs=None):
+    """
+    Join arguments in call together.
+    :param call:
+    :param nargs:  dict from arguments names to how many args it takes, default 1 for all.
+    :return:
+    """
+    if not nargs:
+        nargs = {}
+    assert all(not k.startswith('-') for k in nargs.keys())
+    out = []
+    current_arg = []
+    for c in call:
+        if len(current_arg) > 0:
+            if c.startswith('-') or (nargs.get(current_arg[0].strip('--'), 1) + 1 == len(current_arg)):
+                out.append(' '.join(current_arg))
+                current_arg = []
+        current_arg.append(c)
+    if current_arg:
+        out.append(' '.join(current_arg))
+    return out
+
+
+def _join_lines(lines, max_len):
+    out = ''
+    current_l = ''
+    for l in lines:
+        if len(current_l) + len(l) <= max_len:
+            current_l += l + ' '
+        else:
+            out += current_l.strip() + '\n'
+            current_l = l + ' '
+    if current_l:
+        out += current_l.strip() + '\n'
+    return out
+
+
+
+
+# ------------------------------------------------------------------------------
+
+
+def lift_argument_parser(parser):
+    """ Adds --job_id, --num_jobs and --qsuba_dry_run to parser. These get used by job_id_iterator. """
+    try:
+        job_id = int(os.environ.get('SGE_TASK_ID', 1))
+    except ValueError:
+        job_id = 1
+    parser.add_argument('--job_id', type=int, default=job_id)
+    parser.add_argument('--num_jobs', type=int, default=1)
+    parser.add_argument('--qsuba_dry_run', action='store_const', const=True)
+    parser.add_argument('--qsuba_rerun', type=str)
+
+
+def job_id_iterator(flags):
+    """ Given flags returned by a argparse.ArgumentParser's parse_args() method, where the parser was previously
+    lifted with lift_argument_parser, this method return an a function that takes an iterator and returns a new
+    iterator which only yields elements that should be processed by the current job.
+
+    Usage:
+
+    p = argparse.ArgumentParser()
+    ... add arguments
+    qsuba.lift_argument_parser(p)
+    flags = p.parse_args()
+    it = qsuba.job_id_iterator(flags)
+
+    for el in it(element_generator()):
+        # process el
+    """
+    assert flags.num_jobs >= flags.job_id >= 1
+
+    def _iterator_for_job_id(job_id):
+        if flags.qsuba_rerun:
+            rerun_job_ids = list(map(int, flags.qsuba_rerun.split(',')))
+            if job_id not in rerun_job_ids:
+                print('Skipping job {}, only running {}'.format(job_id, rerun_job_ids))
+                sys.exit(1)
+
+        def _iterator(it):
+            for i, el in enumerate(it):
+                if i % flags.num_jobs != (job_id - 1):  # job_ids start at 1
+                    continue
+                yield el
+
+        return _iterator
+
+    if flags.qsuba_dry_run:
+        def _dry_run_iterator(it):
+            data = list(it)
+            for job_id in range(flags.num_jobs):
+                print(job_id)
+                print('\n'.join(_iterator_for_job_id(job_id)(data)))
+                print('---')
+            print('--qsuba_dry_run, will exit now')
+            sys.exit(0)
+
+        return _dry_run_iterator
+
+    return _iterator_for_job_id(flags.job_id)
+
 
 
 if __name__ == '__main__':
