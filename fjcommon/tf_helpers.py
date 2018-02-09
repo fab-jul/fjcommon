@@ -451,6 +451,33 @@ def add_scalar_summaries_with_prefix(prefix, summaries):
         summary_name = '{}/{}'.format(prefix, loss_name)
         tf.summary.scalar(summary_name, loss_tensor)
 
+
+def prep_for_image_summary(t, n=3, autoscale=False, name='img'):
+    """ given tensor t of shape NCHW, return t[:n, ...] transposed to NHWC, cast to uint8 if not autoscale """
+    assert int(t.shape[1]) == 3, 'Expected N3HW, got {}'.format(t)
+    with tf.name_scope('prep_' + name):
+        t = transpose_NCHW_to_NHWC(t[:n, ...])
+        if autoscale:  # if t is float32, tf.summary.image will automatically rescale
+            assert tf.float32.is_compatible_with(t.dtype)
+            return t
+        else:  # if t is uint8, tf.summary.image will NOT automatically rescale
+            return tf.cast(t, tf.uint8, 'uint8')
+
+
+def prep_for_grayscale_image_summary(t, n=3, autoscale=False, name='img'):
+    """ given tensor t of shape NHW, return t[:n, ...] reshaped to NHW1, cast to uint8 if not autoscale """
+    assert len(t.shape) == 3
+    with tf.name_scope('prep_' + name):
+        t = t[:n, ...]
+        t = tf.expand_dims(t, -1)  # NHW1
+        if autoscale:
+            assert tf.float32.is_compatible_with(t.dtype)
+            return t
+        else:
+            return tf.cast(t, tf.uint8, name='uint8')
+
+
+
 # Saving -----------------------------------------------------------------------
 
 
