@@ -21,6 +21,21 @@ def unzip(gen):
     return zip(*list(gen))
 
 
+def const(val):
+    def _inside(*args, **kwargs):
+        return val
+    return _inside
+
+
+def catcher(exc_cls, handler, f):
+    def _f(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except exc_cls as e:
+            return handler(e)
+    return _f
+
+
 def fst(t):
     return t[0]
 
