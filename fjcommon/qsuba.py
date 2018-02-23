@@ -47,6 +47,7 @@ def main():
     p.add_argument('--skip_tailf', '-q', action='store_const', const=True,
                    help='If given, do not tail -f relevant log file.')
     p.add_argument('--mem', type=int, default=5, help='Memory, in GB, to allocate for job.')
+    p.add_argument('--wait_for', type=str, help='Passed to --hold_jid')
     p.add_argument('--queue', type=str, help='Queue to submit to. If given, -q QUEUE is passed to qsub')
     p.add_argument('--interpreter', type=str, default='python -u',
                    help='What to put on the line before `script` in the auto-generated run file.')
@@ -105,6 +106,8 @@ def run(flags, other_args):
         ]
         if flags.queue:
             qsub_call += ['-q', flags.queue]
+        if flags.wait_for:
+            qsub_call += ['-hold_jid', flags.wait_for]
 
         if flags.hosts:
             qsub_call += ['-l', 'h={}'.format(flags.hosts)]
