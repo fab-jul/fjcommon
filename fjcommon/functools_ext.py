@@ -22,6 +22,11 @@ def return_list(f):
     return compose(list, f)
 
 
+def return_tuple(f):
+    """ Can be used to decorate generator functions. """
+    return compose(tuple, f)
+
+
 def unzip(gen):
     return zip(*list(gen))
 
