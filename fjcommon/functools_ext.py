@@ -17,6 +17,11 @@ def compose(*args):
     return functools.reduce(compose2, args)
 
 
+def return_list(f):
+    """ Can be used to decorate generator functions. """
+    return compose(list, f)
+
+
 def unzip(gen):
     return zip(*list(gen))
 

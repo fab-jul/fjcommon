@@ -39,7 +39,7 @@ def main():
                    help='Path to file where submission log is stored. Submission log: job_id followed by all '
                         'arguments.')
     p.add_argument('--hosts', type=str, help='Passed to qsub as -l h= flag')
-    p.add_argument('--duration', type=str, default='4',
+    p.add_argument('--duration', type=str,
                    help='If int: hours to run job. If str, expected to be HH:MM:SS.')
 
     p.add_argument('--gpu', action='store_true', help='Whether to use gpu')
@@ -91,19 +91,20 @@ def run(flags, other_args):
     follow_file = not flags.skip_tailf
     with tmp_run_file(flags.pre_run_cmds, flags.script, flags.interpreter,
                       remove=flags.skip_tailf) as run_file:
-        if _is_int(flags.duration):
-            h_rt_flag = 'h_rt={:02d}:00:00'.format(int(flags.duration))
-        else:
-            assert ':' in flags.duration
-            h_rt_flag = 'h_rt={}'.format(flags.duration)
-
         qsub_call = [
             'qsub',
             '-o', flags.out_dir,
-            '-l', h_rt_flag,
             '-l', 'h_vmem={}G'.format(flags.mem),
             '-cwd', '-j', 'y',
         ]
+        if flags.duration:
+            if _is_int(flags.duration):
+                h_rt_flag = 'h_rt={:02d}:00:00'.format(int(flags.duration))
+            else:
+                assert ':' in flags.duration
+                h_rt_flag = 'h_rt={}'.format(flags.duration)
+            qsub_call += ['-l', h_rt_flag]
+
         if flags.queue:
             qsub_call += ['-q', flags.queue]
         if flags.wait_for:
