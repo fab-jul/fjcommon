@@ -40,7 +40,7 @@ def central_crop(images_glob, target_w, target_h, append_to_name=''):
 
 def resize(images_glob, target_short_edge, append_to_name='', new_ext=None, skip_existing=True):
     assert isinstance(target_short_edge, int)
-    assert '.' in new_ext, 'Need . in ext, got {}'.format(new_ext)
+    assert not new_ext or ('.' in new_ext), 'Need . in ext, got {}'.format(new_ext)
     report = []
     for img_p in _img_ps(images_glob):
         img_p_base, ext = os.path.splitext(img_p)
@@ -112,7 +112,7 @@ def main(args):
     resize_ccrop.add_argument('imgs_glob', type=str)
     resize_ccrop.add_argument('target_short_edge', type=int)
     resize_ccrop.add_argument('--append_name', type=str, default='')
-    resize_ccrop.add_argument('--new_ext', type=str, default='')
+    resize_ccrop.add_argument('--new_ext', type=str)
     resize_ccrop.add_argument('--skip_existing', action='store_const', const=True)
     # Sizes ---
     parser_ccrop = mode_subparsers.add_parser('sizes')
