@@ -43,6 +43,7 @@ def resize(images_glob, out_dir, target_short_edge, append_to_name='', new_ext=N
     assert not new_ext or ('.' in new_ext), 'Need . in ext, got {}'.format(new_ext)
     if out_dir is None:
         out_dir = os.path.dirname(images_glob)
+        os.makedirs(out_dir, exist_ok=True)
     report = []
     for img_p in _img_ps(images_glob):
         img_name, ext = os.path.splitext(os.path.basename(img_p))
