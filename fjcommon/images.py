@@ -38,15 +38,17 @@ def central_crop(images_glob, target_w, target_h, append_to_name=''):
         im_out.save(img_p_out)
 
 
-def resize(images_glob, target_short_edge, append_to_name='', new_ext=None, skip_existing=True):
+def resize(images_glob, out_dir, target_short_edge, append_to_name='', new_ext=None, skip_existing=True):
     assert isinstance(target_short_edge, int)
     assert not new_ext or ('.' in new_ext), 'Need . in ext, got {}'.format(new_ext)
+    if out_dir is None:
+        out_dir = os.path.dirname(images_glob)
     report = []
     for img_p in _img_ps(images_glob):
-        img_p_base, ext = os.path.splitext(img_p)
+        img_name, ext = os.path.splitext(os.path.basename(img_p))
         if new_ext:
             ext = new_ext
-        img_p_out = img_p_base + append_to_name + ext
+        img_p_out = os.path.join(out_dir, img_name + append_to_name + ext)
 
         if os.path.exists(img_p_out):
             if skip_existing:
@@ -108,12 +110,13 @@ def main(args):
     parser_ccrop.add_argument('target_h', type=int)
     parser_ccrop.add_argument('--append_name', type=str, default='')
     # Resize ---
-    resize_ccrop = mode_subparsers.add_parser('resize')
-    resize_ccrop.add_argument('imgs_glob', type=str)
-    resize_ccrop.add_argument('target_short_edge', type=int)
-    resize_ccrop.add_argument('--append_name', type=str, default='')
-    resize_ccrop.add_argument('--new_ext', type=str)
-    resize_ccrop.add_argument('--skip_existing', action='store_const', const=True)
+    parser_resize = mode_subparsers.add_parser('resize')
+    parser_resize.add_argument('imgs_glob', type=str)
+    parser_resize.add_argument('target_short_edge', type=int)
+    parser_resize.add_argument('--append_name', type=str, default='')
+    parser_resize.add_argument('--out_dir', type=str, default=None)
+    parser_resize.add_argument('--new_ext', type=str)
+    parser_resize.add_argument('--skip_existing', action='store_const', const=True)
     # Sizes ---
     parser_ccrop = mode_subparsers.add_parser('sizes')
     parser_ccrop.add_argument('imgs_glob', type=str)
@@ -121,6 +124,7 @@ def main(args):
     if flags.mode == 'central_crop':
         central_crop(flags.imgs_glob, flags.target_w, flags.target_h, flags.append_name)
     if flags.mode == 'resize':
-        resize(flags.imgs_glob, flags.target_short_edge, flags.append_name, flags.new_ext, flags.skip_existing)
+        resize(flags.imgs_glob, flags.out_dir, flags.target_short_edge,
+               flags.append_name, flags.new_ext, flags.skip_existing)
     elif flags.mode == 'sizes':
         sizes_of_images_in(flags.imgs_glob)
