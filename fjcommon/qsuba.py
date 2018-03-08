@@ -81,6 +81,8 @@ def main():
     # TODO: add --vars or sth to pass env variables to qsub
 
     flags, other_args = p.parse_known_args()
+    if '--' in other_args:  # user passed -- should be ignored because we add it later
+        other_args.remove('--')
     run(flags, other_args)
 
 

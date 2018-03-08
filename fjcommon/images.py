@@ -38,7 +38,8 @@ def central_crop(images_glob, target_w, target_h, append_to_name=''):
         im_out.save(img_p_out)
 
 
-def resize(images_glob, out_dir, target_short_edge, append_to_name='', new_ext=None, skip_existing=True):
+def resize(images_glob, out_dir, target_short_edge, append_to_name='', new_ext=None, skip_existing=True,
+           mode=_get_PIL_Image().BICUBIC):
     assert isinstance(target_short_edge, int)
     assert not new_ext or ('.' in new_ext), 'Need . in ext, got {}'.format(new_ext)
     if out_dir is None:
@@ -65,7 +66,6 @@ def resize(images_glob, out_dir, target_short_edge, append_to_name='', new_ext=N
         h_is_short_edge = h <= w
 
         short_edge = h if h_is_short_edge else w
-        assert short_edge >= target_short_edge
         long_edge = w if h_is_short_edge else h
         ratio = target_short_edge / short_edge
         new_short = target_short_edge
@@ -77,7 +77,7 @@ def resize(images_glob, out_dir, target_short_edge, append_to_name='', new_ext=N
             new_h, new_w = new_long, new_short
 
         try:
-            im_out = im.resize((new_w, new_h), _get_PIL_Image().ANTIALIAS)
+            im_out = im.resize((new_w, new_h), mode)
             im_out.save(img_p_out)
         except OSError as e:
             print('Caught {}, ignoring'.format(e))
@@ -129,3 +129,8 @@ def main(args):
                flags.append_name, flags.new_ext, flags.skip_existing)
     elif flags.mode == 'sizes':
         sizes_of_images_in(flags.imgs_glob)
+
+
+if __name__ == '__main__':
+    main(None)
+
