@@ -46,6 +46,12 @@ def catcher(exc_cls, handler, f):
     return _f
 
 
+def catch(exc_cls, handler):
+    def decorator(f):
+        return catcher(exc_cls, handler, f)
+    return decorator
+
+
 def fst(t):
     return t[0]
 
