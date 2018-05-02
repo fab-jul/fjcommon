@@ -4,6 +4,23 @@
 import functools
 
 
+def assert_post_cond(cond):
+    """
+    Decorator. Example:
+    >>> @assert_post_cond(lambda a: a > 0)
+    >>> def foo(bar):
+    >>>     return max(bar, 0)
+    :param cond: function mapping return value to bool
+    """
+    def decorator(f):
+        def wrapped_f(*args, **kwargs):
+            ret = f(*args, **kwargs)
+            assert cond(ret)
+            return ret
+        return wrapped_f
+    return decorator
+
+
 def compose(*args):
     """
     :param args: a list of functions
@@ -15,6 +32,33 @@ def compose(*args):
         return composed
 
     return functools.reduce(compose2, args)
+
+
+def partial(f):
+    """
+    Enables creating of partial functions using the ellipsis constant. E.g.
+
+    >>> import operator
+    >>> append_world = partial(operator.add)(..., 'world')
+    >>> append_world('hello')
+    """
+    def create_f(*create_args):
+        def new_f(*passed_args):
+            passed_args_it = iter(passed_args)
+            try:
+                args_for_f = [
+                    next(passed_args_it) if create_arg is ... else create_arg
+                    for create_arg in create_args]
+            except StopIteration:
+                num_expected = sum(1 for create_arg in create_args if create_arg is ...)
+                num_actual = len(passed_args)
+                create_args_str = tuple(create_arg if create_arg is not ... else '...'
+                                        for create_arg in create_args)
+                raise ValueError('Not enough arguments, expected {} ({}) got {} ({})'.format(
+                        create_args_str, num_expected, passed_args, num_actual))
+            return f(*args_for_f)
+        return new_f
+    return create_f
 
 
 def return_list(f):
@@ -32,12 +76,15 @@ def unzip(gen):
 
 
 def const(val):
+    """ :returns a function f that returns val no matter with which arguments it is called. """
     def _inside(*args, **kwargs):
         return val
     return _inside
 
 
 def catcher(exc_cls, handler, f):
+    """ :returns a function f' that behaves like f except when an exception e of type exc_cls is caught, in which case
+    handler(e) is returned """
     def _f(*args, **kwargs):
         try:
             return f(*args, **kwargs)
@@ -47,6 +94,7 @@ def catcher(exc_cls, handler, f):
 
 
 def catch(exc_cls, handler):
+    """ Like catcher but can be used as a decorator. """
     def decorator(f):
         return catcher(exc_cls, handler, f)
     return decorator
