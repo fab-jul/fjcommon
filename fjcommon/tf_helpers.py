@@ -206,7 +206,7 @@ def create_train_op_with_different_lrs(total_loss, optimizer_default, special_op
         with tf.name_scope(_GRADIENT_SUMMARY_NAME_SCOPE):
             tf.summary.scalar('global_norm', global_norm)
 
-    global_step = tf.contrib.slim.get_or_create_global_step()
+    global_step = tf.train.get_or_create_global_step()
     grads_special_start_idx = len(trainable_vars_without_special)
     grads_default = grads[:grads_special_start_idx]
     has_default_optimizer = optimizer_default is not None

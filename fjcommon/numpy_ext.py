@@ -24,6 +24,7 @@ def reshape_into_tiles(a, axis, filler_mat=None):
 
 
 def is_int(s):
+    """ :return True iff s can be converted to an integer using int() """
     try:
         int(s)
         return True
@@ -33,7 +34,7 @@ def is_int(s):
 
 def get_idx_slice(axis, i, ndim):
     """
-    Returns a slice s where
+    Returns a slice `s` where
 
     mat[s] == mat[:, ---, :, i, :, ---, :]
                   |_______|     |_______|

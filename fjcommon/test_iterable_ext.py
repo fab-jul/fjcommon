@@ -1,5 +1,5 @@
 from unittest import TestCase
-from . import iterable_tools as it
+from . import iterable_ext as it
 
 
 class TestIterableTools(TestCase):

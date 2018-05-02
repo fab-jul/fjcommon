@@ -11,7 +11,7 @@ import argparse
 import glob
 from fjcommon import tf_helpers
 from fjcommon import printing
-from fjcommon import iterable_tools
+from fjcommon import iterable_ext
 
 
 _JOB_SUBDIR_PREFIX = 'job_'
@@ -27,21 +27,16 @@ def create_images_records_distributed(image_dir, job_id, num_jobs, out_dir, num_
     assert 1 <= job_id <= num_jobs, 'Invalid job_id: {}'.format(job_id)
     assert num_jobs >= 1, 'Invalid num_jobs: {}'.format(num_jobs)
     image_paths = _get_image_paths(image_dir, shuffle=num_per_example == 1)
-    image_paths_per_job = iterable_tools.chunks(image_paths, num_chunks=num_jobs)
-    image_paths_current_job = iterable_tools.get_element_at(job_id - 1, image_paths_per_job)
+    image_paths_per_job = iterable_ext.chunks(image_paths, num_chunks=num_jobs)
+    image_paths_current_job = iterable_ext.get_element_at(job_id - 1, image_paths_per_job)
     consecutive_frames_paths = iterate_in_consecutive_frame_tuples(
         image_paths_current_job, num_consecutive=num_per_example)
-    consecutive_frames_paths = list(iterable_tools.printing_iterator(consecutive_frames_paths))
+    consecutive_frames_paths = list(iterable_ext.printing_iterator(consecutive_frames_paths))
     _shuffle_in_place(consecutive_frames_paths)
     feature_dicts = wrap_frames_in_feature_dicts(consecutive_frames_paths)
 
     out_dir_job = out_dir if num_jobs == 1 else path.join(out_dir, '{}{}'.format(_JOB_SUBDIR_PREFIX, job_id))
     create_records_with_feature_dicts(feature_dicts, out_dir_job, num_per_shard)
-
-
-def foo():
-    yield {key: bytes_feature(open(p, 'rb').read()) for key, p in zip(keys, frame_paths_slice)}
-    create_records_with_feature_dicts()
 
 
 def join_created_images_records(out_dir, num_jobs):
@@ -92,7 +87,7 @@ def iterate_in_consecutive_frame_tuples(frame_paths, num_consecutive, frame_id_r
         p_base, p_id = m.group(1, 2)
         return p_base, p_id
 
-    for image_paths_slice in iterable_tools.sliced_iter(
+    for image_paths_slice in iterable_ext.sliced_iter(
             frame_paths, slice_len=num_consecutive, allow_smaller_final_slice=False):
         # image_paths_slice is a list of paths
         image_paths_slice_it = iter(image_paths_slice)
