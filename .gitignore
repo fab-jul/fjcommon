@@ -10,6 +10,9 @@ __pycache__/
 # IntelliJ
 .idea/workspace.xml
 .idea/tasks.xml
+.idea/webServers.xml
+.idea/deployment.xml
+.idea/misc.xml
 
 # C extensions
 *.so
