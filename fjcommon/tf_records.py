@@ -255,6 +255,9 @@ def inspect(records_glob):
         yield from rec_keys
         yield None
 
+    yield 'Found {} examples in total'.format(num_examples)
+    yield from all_keys
+
 
 def main(args):
     parser = argparse.ArgumentParser()
