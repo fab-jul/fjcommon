@@ -71,6 +71,34 @@ def return_tuple(f):
     return compose(tuple, f)
 
 
+def print_generator(sep='---'):
+    def decorator(f):
+        def wrapper(*args, **kwargs):
+            print_sep = Flag()
+            for el in f(*args, **kwargs):
+                if el is None:
+                    print_sep.set()
+                else:
+                    # we got another element, but should print the separator first
+                    print_sep.if_set(lambda: print(sep))
+                    print(el)
+        return wrapper
+    return decorator
+
+
+class Flag(object):
+    def __init__(self):
+        self._flag = False
+
+    def set(self):
+        self._flag = True
+
+    def if_set(self, action):
+        if self._flag:
+            action()
+            self._flag = False
+
+
 def unzip(gen):
     return zip(*list(gen))
 
