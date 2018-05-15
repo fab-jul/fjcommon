@@ -1,2 +1,3 @@
 # fjcommon
-Python code shared accross my projects
+
+Some python helper libraries.
