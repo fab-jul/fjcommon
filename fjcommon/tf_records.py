@@ -5,6 +5,7 @@ import itertools
 import tensorflow as tf
 from os import path
 import os
+import sys
 import re
 import random
 import argparse
@@ -173,6 +174,16 @@ def create_records_with_feature_dicts(feature_dicts, out_dir, num_per_shard, max
         print('Nothing written...')
 
 
+def create_record(in_paths, out_record_path, key=_DEFAULT_FEATURE_KEY):
+    print('Writing {} images to {}...'.format(len(in_paths), out_record_path))
+    writer = tf.python_io.TFRecordWriter(out_record_path)
+    for feature_dict in {key: bytes_feature(open(p, 'rb').read()) for p in in_paths}:
+        example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
+        writer.write(example.SerializeToString())
+    writer.close()
+
+
+
 def _records_file_name(base_filename, shard_number):
     return '{}_{:08d}.{}'.format(base_filename, shard_number, _TF_RECORD_EXT)
 
@@ -262,6 +273,11 @@ def inspect(records_glob):
 def main(args):
     parser = argparse.ArgumentParser()
     mode_subparsers = parser.add_subparsers(dest='mode', title='Mode')
+    # Make single image record ---
+    parser_make_single = mode_subparsers.add_parser('mk_img_rec', help='Make single TF record from images.')
+    parser_make_single.add_argument('paths', type=str, nargs='+')
+    parser_make_single.add_argument('--out_record_path', '-o', type=str, required=True)
+    parser_make_single.add_argument('--feature_key', type=str, default=_DEFAULT_FEATURE_KEY)
     # Make image records ---
     parser_make = mode_subparsers.add_parser('mk_img_recs', help='Make TF records from images.')
     parser_make.add_argument('out_dir', type=str)
@@ -303,7 +319,9 @@ def main(args):
     parser_check.add_argument('num_per_ex', type=int)
     # ---
     flags = parser.parse_args(args)
-    if flags.mode == 'mk_img_recs':
+    if flags.mode == 'mk_img_rec':
+        create_record(flags.paths, flags.out_record_path, flags.feature_key)
+    elif flags.mode == 'mk_img_recs':
         create_images_records_distributed(flags.image_glob, job_id=1, num_jobs=1, out_dir=flags.out_dir,
                                           num_per_shard=flags.num_per_shard, num_per_example=flags.num_per_ex,
                                           feature_key=flags.feature_key)
@@ -321,3 +339,6 @@ def main(args):
     else:
         parser.print_usage()
 
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
