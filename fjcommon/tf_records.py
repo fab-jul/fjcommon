@@ -175,13 +175,12 @@ def create_records_with_feature_dicts(feature_dicts, out_dir, num_per_shard, max
 
 
 def create_record(in_paths, out_record_path, key=_DEFAULT_FEATURE_KEY):
-    print('Writing {} images to {}...'.format(len(in_paths), out_record_path))
-    writer = tf.python_io.TFRecordWriter(out_record_path)
-    for feature_dict in {key: bytes_feature(open(p, 'rb').read()) for p in in_paths}:
-        example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
-        writer.write(example.SerializeToString())
-    writer.close()
-
+    with tf.python_io.TFRecordWriter(out_record_path) as writer:
+        print('Writing {} images to {}...'.format(len(in_paths), out_record_path))
+        for p in in_paths:
+            feature_dict = {key: bytes_feature(open(p, 'rb').read())}
+            example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
+            writer.write(example.SerializeToString())
 
 
 def _records_file_name(base_filename, shard_number):
