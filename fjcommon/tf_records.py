@@ -10,6 +10,7 @@ import re
 import random
 import argparse
 import glob
+from PIL import Image
 from fjcommon import tf_helpers
 from fjcommon import printing
 from fjcommon import iterable_ext
@@ -178,6 +179,10 @@ def create_record(in_paths, out_record_path, key=_DEFAULT_FEATURE_KEY):
     with tf.python_io.TFRecordWriter(out_record_path) as writer:
         print('Writing {} images to {}...'.format(len(in_paths), out_record_path))
         for p in in_paths:
+            w, h = Image.open(p).size
+            if w < 256 or h < 256:
+                print('Unexpected {} ({}x{})'.format(p, w, h))
+                continue
             feature_dict = {key: bytes_feature(open(p, 'rb').read())}
             example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
             writer.write(example.SerializeToString())
