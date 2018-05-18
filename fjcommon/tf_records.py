@@ -175,14 +175,13 @@ def create_records_with_feature_dicts(feature_dicts, out_dir, num_per_shard, max
         print('Nothing written...')
 
 
-def create_record(in_paths, out_record_path, key=_DEFAULT_FEATURE_KEY):
+def create_record(in_paths, out_record_path, key=_DEFAULT_FEATURE_KEY, assert_size=None):
     with tf.python_io.TFRecordWriter(out_record_path) as writer:
         print('Writing {} images to {}...'.format(len(in_paths), out_record_path))
         for p in in_paths:
-            w, h = Image.open(p).size
-            if w < 256 or h < 256:
-                print('Unexpected {} ({}x{})'.format(p, w, h))
-                continue
+            if assert_size:
+                w, h = Image.open(p).size
+                assert w >= assert_size and h >= assert_size
             feature_dict = {key: bytes_feature(open(p, 'rb').read())}
             example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
             writer.write(example.SerializeToString())
@@ -253,7 +252,7 @@ def check(records_glob, out_dir, num_imgs_to_save, num_per_ex):
 def inspect(records_glob):
     all_keys = set()
     num_examples = 0
-    for rec in glob.glob(records_glob):
+    for rec in sorted(glob.glob(records_glob)):
         rec_keys = set()
         count = -1
         yield 'Iterating {}...'.format(rec)
@@ -282,6 +281,8 @@ def main(args):
     parser_make_single.add_argument('paths', type=str, nargs='+')
     parser_make_single.add_argument('--out_record_path', '-o', type=str, required=True)
     parser_make_single.add_argument('--feature_key', type=str, default=_DEFAULT_FEATURE_KEY)
+    parser_make_single.add_argument('--assert_size', metavar='LENGTH', type=str,
+                                    help='If given, assert that for each image, width >= LENGTH and height >= LENGTH.')
     # Make image records ---
     parser_make = mode_subparsers.add_parser('mk_img_recs', help='Make TF records from images.')
     parser_make.add_argument('out_dir', type=str)
@@ -324,7 +325,7 @@ def main(args):
     # ---
     flags = parser.parse_args(args)
     if flags.mode == 'mk_img_rec':
-        create_record(flags.paths, flags.out_record_path, flags.feature_key)
+        create_record(flags.paths, flags.out_record_path, flags.feature_key, flags.assert_size)
     elif flags.mode == 'mk_img_recs':
         create_images_records_distributed(flags.image_glob, job_id=1, num_jobs=1, out_dir=flags.out_dir,
                                           num_per_shard=flags.num_per_shard, num_per_example=flags.num_per_ex,
