@@ -4,6 +4,8 @@
 import functools
 
 
+
+
 def assert_post_cond(cond):
     """
     Decorator. Example:
@@ -32,6 +34,9 @@ def compose(*args):
         return composed
 
     return functools.reduce(compose2, args)
+
+
+lmap = compose(list, map)
 
 
 def partial(f):
