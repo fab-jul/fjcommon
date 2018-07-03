@@ -2,8 +2,7 @@
 
 
 import functools
-
-
+import itertools
 
 
 def assert_post_cond(cond):
@@ -36,7 +35,14 @@ def compose(*args):
     return functools.reduce(compose2, args)
 
 
+# like map but returns list
 lmap = compose(list, map)
+
+# concatenate list of lists to list, [[a]] -> [a]
+concat = itertools.chain.from_iterable
+
+# like concat but returns list
+lconcat = compose(list, concat)
 
 
 def partial(f):
