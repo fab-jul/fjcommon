@@ -45,6 +45,7 @@ import sys
 import re
 import json
 import itertools
+from fjcommon.assertions import assertExc
 
 
 _PAT_CONSTRAIN = re.compile(r'^constrain\s+([^\s]+?)\s*::\s*(.+)$')
@@ -174,6 +175,17 @@ class _Config(object):  # placeholder object filled with setattr
             for k, v in self.all_params_and_values():
                 yield '{} = {}'.format(k, v)
         return '\n'.join(_lines())
+
+    def __getitem__(self, items):
+        """
+        Allows usage as
+        lr, L, num_layers = config['lr', 'L', 'num_layer']
+        """
+        if not isinstance(items, tuple):
+            items = [items]
+        for item in items:
+            assertExc(item in self.__dict__, 'Invalid parameter: {}'.format(item), AttributeError)
+            yield self.__dict__[item]
 
 
 def compare(c1, c2):
