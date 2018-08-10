@@ -18,7 +18,7 @@ from collections import namedtuple
 import shutil
 
 
-_QSUBA_GIT_REF = 'QSUBA_GIT_REF'
+QSUBA_GIT_REF = 'QSUBA_GIT_REF'
 
 
 GitManager = namedtuple('GitManager', ['git_root_dir', 'git_url', 'git_checkout', 'qsuba_git_helper_path'])
@@ -72,7 +72,7 @@ def main():
                    metavar=('GIT_ROOT_DIR_LOCAL', 'GIT_URL'))
     p.add_argument('--git_checkout', '-c', type=str, metavar='GIT_REF',
                    help='This is passed to git checkout if --git_repo is given. This will be exported as {} for any '
-                        'script to check.'.format(_QSUBA_GIT_REF))
+                        'script to check.'.format(QSUBA_GIT_REF))
 
     p.add_argument('--var', '-v', type=str, action='append', default=[],
                    help='Variables to pass to qsub. Use multiple flags for multiple variables. Example:\n'
@@ -239,7 +239,7 @@ def tmp_run_file(pre_run_cmds, script_name, interpreter, remove):
             f.write(' ${gev.qsuba_git_helper} $UNIQUE_ID ${gev.url} ${gev.ref}\n'.format(gev=gev))
             f.write(' rc=$?; if [[ $rc != 0 ]]; then echo "Error $rc"; exit $rc; fi\n')
             f.write(' cd $UNIQUE_ID && pwd  # where the repo has been cloned into\n')
-            f.write(' export {qsuba_git_ref}=${gev.ref}\n'.format(qsuba_git_ref=_QSUBA_GIT_REF, gev=gev))
+            f.write(' export {qsuba_git_ref}=${gev.ref}\n'.format(qsuba_git_ref=QSUBA_GIT_REF, gev=gev))
             f.write('fi\n')
 
             # Run script
