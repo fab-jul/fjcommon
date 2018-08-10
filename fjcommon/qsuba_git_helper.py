@@ -2,9 +2,7 @@
 
 import os
 import sys
-#import shutil
 import subprocess
-#import fasteners
 import argparse
 
 
@@ -45,9 +43,6 @@ def _call_and_check(*args, **kwargs):
     if ret_code != 0:
         print('{} failed: {}'.format(' '.join(cmd), ret_code))
         sys.exit(ret_code)
-
-
-
 
 
 def main():

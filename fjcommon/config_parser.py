@@ -45,7 +45,7 @@ import sys
 import re
 import json
 import itertools
-from fjcommon.assertions import assertExc
+from fjcommon.assertions import assert_exc
 
 
 _PAT_CONSTRAIN = re.compile(r'^constrain\s+([^\s]+?)\s*::\s*(.+)$')
@@ -184,7 +184,7 @@ class _Config(object):  # placeholder object filled with setattr
         if not isinstance(items, tuple):
             items = [items]
         for item in items:
-            assertExc(item in self.__dict__, 'Invalid parameter: {}'.format(item), AttributeError)
+            assert_exc(item in self.__dict__, 'Invalid parameter: {}'.format(item), AttributeError)
             yield self.__dict__[item]
 
 
