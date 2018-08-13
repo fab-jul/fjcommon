@@ -70,6 +70,7 @@ def main():
                    help='Path to executable qsuba_git_helper.py, expected to be in $PATH by default.')
     p.add_argument('--git_repo', type=str, nargs=2,
                    metavar=('GIT_ROOT_DIR_LOCAL', 'GIT_URL'))
+    p.add_argument('--git_cd', type=str, help='Run code from $GIT_ROOT/GIT_CD.', default='')
     p.add_argument('--git_checkout', '-c', type=str, metavar='GIT_REF',
                    help='This is passed to git checkout if --git_repo is given. This will be exported as {} for any '
                         'script to check.'.format(QSUBA_GIT_REF))
@@ -182,10 +183,12 @@ def get_envs(flags):
     if flags.git_repo:
         git_root_dir_local, git_url = flags.git_repo
         git_qsuba_helper = flags.git_qsuba_helper
+        git_cd = flags.git_cd
         env.extend([
             (_GitEnvVars.root, git_root_dir_local),
             (_GitEnvVars.url, git_url),
-            (_GitEnvVars.qsuba_git_helper, git_qsuba_helper)
+            (_GitEnvVars.qsuba_git_helper, git_qsuba_helper),
+            (_GitEnvVars.cd, git_cd),
         ])
         if flags.git_checkout:
             env.append((_GitEnvVars.ref, flags.git_checkout))
@@ -211,16 +214,18 @@ def _is_int(v):
         return False
 
 
-class _GitEnvVars:
+class _GitEnvVars(object):
     ref = 'GIT_ENV_REF'
     root = 'GIT_ENV_ROOT_DIR'
     url = 'GIT_ENV_URL'
+    cd = 'GIT_CD'
     qsuba_git_helper = 'GIT_ENV_QSUBA_HELPER_P'
 
 
 @contextmanager
 def tmp_run_file(pre_run_cmds, script_name, interpreter, remove):
     # make sure only one qsuba process changes the submission script at a time
+    #
     with fasteners.InterProcessLock('.sub_creation_lock'.format(script_name)):
         fn = '{}_sub.sh'.format(os.path.splitext(script_name)[0])
         fn_tmp = '{}_sub_tmp.sh'.format(os.path.splitext(script_name)[0])
@@ -238,7 +243,7 @@ def tmp_run_file(pre_run_cmds, script_name, interpreter, remove):
             f.write(' if [[ -n $SGE_GPU ]]; then UNIQUE_ID=$SGE_GPU; else UNIQUE_ID="cpu"; fi\n'.format(gev=gev))
             f.write(' ${gev.qsuba_git_helper} $UNIQUE_ID ${gev.url} ${gev.ref}\n'.format(gev=gev))
             f.write(' rc=$?; if [[ $rc != 0 ]]; then echo "Error $rc"; exit $rc; fi\n')
-            f.write(' cd $UNIQUE_ID && pwd  # where the repo has been cloned into\n')
+            f.write(' cd $UNIQUE_ID/${gev.cd} && pwd  # where the repo has been cloned into\n'.format(gev=gev))
             f.write(' export {qsuba_git_ref}=${gev.ref}\n'.format(qsuba_git_ref=QSUBA_GIT_REF, gev=gev))
             f.write('fi\n')
 

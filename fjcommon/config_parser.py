@@ -39,6 +39,9 @@ lr_sweep/lr_1e-4:
 
 """
 
+# TODO:
+# - some support for per-module parameters. could be automatically generated? or unique syntax?
+
 from os import path
 import os
 import sys
@@ -186,6 +189,32 @@ class _Config(object):  # placeholder object filled with setattr
         for item in items:
             assert_exc(item in self.__dict__, 'Invalid parameter: {}'.format(item), AttributeError)
             yield self.__dict__[item]
+
+    def __getattr__(self, item):
+        """
+        TODO: this is WIP. see top of file
+        This function returns config[item] if it exists.
+        if it doesn't exist, it checks for module parameters, and returnes a filtered config. Example:
+        some_config:
+            lr = 1e-4
+            ae_x = 1
+            ae_y = 2
+        some_config.ae -> {x: 1, y: 2}
+        """
+        if item in self.__dict__:
+            return self.__dict__[item]
+        prefix = item + '_'
+        filtered_dict = {k.replace(prefix, ''): v for k, v in self.__dict__.items() if k.startswith(prefix)}
+        if len(filtered_dict) == 0:
+            raise AttributeError('{} has no attribute {} and no attributes starting with {}'.format(
+                    self.__class__.__name__, item, prefix))
+        # create filtered config
+        return _Config()._setattr_from_dict(filtered_dict)
+
+    def _setattr_from_dict(self, d):
+        for k, v in d.items():
+            setattr(self, k, v)
+        return self
 
 
 def compare(c1, c2):
