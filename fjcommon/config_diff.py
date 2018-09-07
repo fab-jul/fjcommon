@@ -41,7 +41,6 @@ class _Comparison(object):
 
 def _compare(config_a: Config, config_b: Config):
     config_b_params = {k: v for k, v in config_b.all_params_and_values()}
-    print(config_b_params)
     for k_a, v_a in config_a.all_params_and_values():
         if k_a in config_b_params:
             yield _Comparison(k_a, v_a, config_b_params[k_a])
