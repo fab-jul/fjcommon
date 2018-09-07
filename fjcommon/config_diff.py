@@ -7,6 +7,7 @@ shows the differences
 import argparse
 
 from fjcommon.config_parser import _Config as Config
+from fjcommon.config_parser import parse_configs
 from fjcommon.iterable_ext import filter_split
 
 
@@ -61,7 +62,8 @@ def main():
     p.add_argument('config_b')
     p.add_argument('--same', action='store_true')
     flags = p.parse_args()
-    diff(flags.config_a, flags.config_b, flags.same)
+    (c_a, c_b), _= parse_configs(flags.config_a, flags.config_b)
+    diff(c_a, c_b, flags.same)
 
 
 
