@@ -49,10 +49,15 @@ import re
 import json
 import itertools
 from fjcommon.assertions import assert_exc
+from fjcommon import functools_ext as ft
 
 
 _PAT_CONSTRAIN = re.compile(r'^constrain\s+([^\s]+?)\s*::\s*(.+)$')
 _PAT_PARAM = re.compile(r'^([^\s]+?)\s*=\s*(.+)$')
+
+
+def parse_configs(*configs):
+    return ft.unzip(map(parse, configs))
 
 
 def parse(config_p):
