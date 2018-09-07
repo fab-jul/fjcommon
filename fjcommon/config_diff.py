@@ -13,13 +13,15 @@ from fjcommon.iterable_ext import filter_split
 def diff(config_a, config_b, show_same):
     cs = sorted(_compare(config_a, config_b), key=lambda c: c.k)
     same, different = filter_split(lambda c: c.same(), cs)
-    if show_same:
+    if show_same and len(same) > 0:
         print('* Same **********')
         for c in same:
             print(c)
-    print('* Different *****')
-    for c in different:
-        print(c)
+
+    if len(different) > 0:
+        print('* Different *****')
+        for c in different:
+            print(c)
 
 
 class _Comparison(object):
