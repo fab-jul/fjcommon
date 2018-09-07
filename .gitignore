@@ -1,6 +1,11 @@
 # update script
 update.sh
 
+# osX
+.DS_Store
+
+# pytest
+.pytest_cache
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -13,6 +18,7 @@ __pycache__/
 .idea/webServers.xml
 .idea/deployment.xml
 .idea/misc.xml
+.idea/other.xml
 
 # C extensions
 *.so
