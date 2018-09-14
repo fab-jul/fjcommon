@@ -143,7 +143,7 @@ class _Config(object):  # placeholder object filled with setattr
 
     def all_params_and_values(self):
         return ((k, v) for k, v in sorted(self.__dict__.items())
-                if re.match(r'[A-Za-z][A-Za-z_]+', k))
+                if re.match(r'[A-Za-z]+', k))
 
     def __str__(self):
         def _lines():
