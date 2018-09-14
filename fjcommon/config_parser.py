@@ -189,7 +189,29 @@ class _Config(object):  # placeholder object filled with setattr
         return self
 
 
+def test_config(tmpdir):
+    spec = '\n'.join([
+        "lr = 1e-4",
+        "L = 7",
+        "c = L // 2",
+        "ae.c = 123",
+        "ae.ae.d = 124"
+        ])
 
+    print(spec)
+    p = str(tmpdir.join('config.cf'))
+    with open(p, 'w') as f:
+        f.write(spec)
 
+    config, _ = parse(p)
 
+    assert config.lr == 1e-4
+    assert config.L == 7
+    assert config.c == 3
+
+    config_ae = config.ae
+    assert config_ae.c == 123
+    assert config_ae.ae.d == 124
+
+    print(config.ae)
 
