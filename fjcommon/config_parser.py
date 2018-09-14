@@ -60,6 +60,7 @@ _SUB_SEP = os.environ.get('FJCOMMON_CONFIGP_SUBSEP', '.')
 
 
 def parse_configs(*configs):
+    """ Parse multiple configs """
     return ft.unzip(map(parse, configs))
 
 
@@ -72,43 +73,6 @@ def parse(config_p):
     config, root_path = _parse(config_p)
     rel_path = path.abspath(config_p).replace(path.dirname(root_path), '').strip(path.sep)
     return config, rel_path
-
-
-def _gen_grid_search_configs(grid_spec, base_config_p, outdir):
-    """
-    Generates each possible combination of parameters
-    :param grid_spec: Path to a JSON or JSON string containing a dictionary mapping parameter names to values. Example:
-        {"lr": [1e-06, 1e-07], "normalization": ["OFF", "FIXED"]}
-    :param base_config_p: config to import into each grid spec file
-    :param outdir: where to save the configs
-    """
-    base_config_dir, base_config_name = path.split(base_config_p)
-    outdir_to_base_dir = path.relpath(base_config_dir, outdir)  # to get nice paths like ../base
-    os.makedirs(outdir, exist_ok=True)
-
-    grid_spec = _parse_grid_spec(grid_spec)
-    grid_spec_its = [
-        [(param, val) for val in grid_spec[param]]
-        for param in sorted(grid_spec.keys())]
-
-    for config in itertools.product(*grid_spec_its):
-        unique_name = '_'.join(param[0] + str(val) for param, val in config)
-        p = path.join(outdir, unique_name)
-        print(p)
-        with open(p, 'w+') as f:
-            f.write('use {}\n'.format(path.join(outdir_to_base_dir, base_config_name)))
-            f.write('\n'.join('{} = {}'.format(param, val) for param, val in config))
-            f.write('\n')
-
-
-def _parse_grid_spec(grid_spec_p):
-    if path.exists(grid_spec_p):
-        return json.load(open(grid_spec_p, 'r'))
-    try:
-        return json.loads(grid_spec_p)
-    except json.JSONDecodeError as e:
-        print('Neither valid path, nor valid JSON: {}\n{}'.format(grid_spec_p, e))
-        sys.exit(1)
 
 
 def _parse(config_p):
@@ -225,24 +189,7 @@ class _Config(object):  # placeholder object filled with setattr
         return self
 
 
-def compare(c1, c2):
-    print('Comparing {}, {}'.format(os.path.basename(c1), os.path.basename(c2)))
-
-    c1, _ = parse(c1)
-    c2, _ = parse(c2)
-
-    for k, v1 in c1.all_params_and_values():
-        v2 = c2.__dict__[k]
-        if v2 != v1:
-            print('{}: {} != {}'.format(k, v1, v2))
 
 
-if __name__ == '__main__':
-    # compare(sys.argv[1], sys.argv[2])
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('grid_spec', type=str, help='Path or inline JSON')
-    parser.add_argument('base_config_p', type=str)
-    parser.add_argument('outdir', type=str)
-    flags = parser.parse_args()
-    _gen_grid_search_configs(flags.grid_spec, flags.base_config_p, flags.outdir)
+
+
