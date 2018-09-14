@@ -62,7 +62,7 @@ def main():
     p.add_argument('config_b')
     p.add_argument('--same', action='store_true')
     flags = p.parse_args()
-    (c_a, c_b), _= parse_configs(flags.config_a, flags.config_b)
+    (c_a, c_b), _ = parse_configs(flags.config_a, flags.config_b)
     diff(c_a, c_b, flags.same)
 
 

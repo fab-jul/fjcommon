@@ -56,6 +56,9 @@ _PAT_CONSTRAIN = re.compile(r'^constrain\s+([^\s]+?)\s*::\s*(.+)$')
 _PAT_PARAM = re.compile(r'^([^\s]+?)\s*=\s*(.+)$')
 
 
+_SUB_SEP = os.environ.get('FJCOMMON_CONFIGP_SUBSEP', '.')
+
+
 def parse_configs(*configs):
     return ft.unzip(map(parse, configs))
 
@@ -202,13 +205,13 @@ class _Config(object):  # placeholder object filled with setattr
         if it doesn't exist, it checks for module parameters, and returnes a filtered config. Example:
         some_config:
             lr = 1e-4
-            ae_x = 1
-            ae_y = 2
+            ae.x = 1
+            ae.y = 2
         some_config.ae -> {x: 1, y: 2}
         """
         if item in self.__dict__:
             return self.__dict__[item]
-        prefix = item + '_'
+        prefix = item + _SUB_SEP
         filtered_dict = {k.replace(prefix, ''): v for k, v in self.__dict__.items() if k.startswith(prefix)}
         if len(filtered_dict) == 0:
             raise AttributeError('{} has no attribute {} and no attributes starting with {}'.format(
