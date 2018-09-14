@@ -59,6 +59,10 @@ _PAT_PARAM = re.compile(r'^([^\s]+?)\s*=\s*(.+)$')
 _SUB_SEP = os.environ.get('FJCOMMON_CONFIGP_SUBSEP', '.')
 
 
+class _ParseError(Exception):
+    pass
+
+
 def parse_configs(*configs):
     """ Parse multiple configs """
     return ft.unzip(map(parse, configs))
@@ -113,7 +117,10 @@ def _update_config(config, lines):
         except SyntaxError:
             raise SyntaxError('Cannot parse line: {}'.format(line))
         config.assert_fullfills_constraint(var_name, var_value)
-        setattr(config, var_name, var_value)
+        try:
+            config.set_attr(var_name, var_value)
+        except _ParseError as e:
+            raise SyntaxError('Cannot parse line: {} ({})'.format(line, e))
     return config
 
 
@@ -143,7 +150,11 @@ class _Config(object):  # placeholder object filled with setattr
 
     def all_params_and_values(self):
         return ((k, v) for k, v in sorted(self.__dict__.items())
-                if re.match(r'[A-Za-z]+', k))
+                if self.is_valid_key(k))
+
+    @staticmethod
+    def is_valid_key(k):
+        return re.match(r'[A-Za-z]+', k) is not None
 
     def __str__(self):
         def _lines():
@@ -161,6 +172,11 @@ class _Config(object):  # placeholder object filled with setattr
         for item in items:
             assert_exc(item in self.__dict__, 'Invalid parameter: {}'.format(item), AttributeError)
             yield self.__dict__[item]
+
+    def set_attr(self, k, v):
+        if not self.is_valid_key(k):
+            raise _ParseError('Invalid key: {}'.format(k))
+        setattr(self, k, v)
 
     def __getattr__(self, item):
         """
@@ -190,6 +206,7 @@ class _Config(object):  # placeholder object filled with setattr
 
 
 def test_config(tmpdir):
+    import pytest
     spec = '\n'.join([
         "lr = 1e-4",
         "L = 7",
@@ -214,4 +231,10 @@ def test_config(tmpdir):
     assert config_ae.ae.d == 124
 
     print(config.ae)
+
+    # error
+    with pytest.raises(SyntaxError):
+        _update_config(_Config(), ['_illegal = 5'])
+    # assert does not raise
+    _update_config(_Config(), ['i = 5'])
 
