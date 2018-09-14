@@ -176,7 +176,7 @@ class _Config(object):  # placeholder object filled with setattr
         if item in self.__dict__:
             return self.__dict__[item]
         prefix = item + _SUB_SEP
-        filtered_dict = {k.replace(prefix, ''): v for k, v in self.__dict__.items() if k.startswith(prefix)}
+        filtered_dict = {k.replace(prefix, '', 1): v for k, v in self.__dict__.items() if k.startswith(prefix)}
         if len(filtered_dict) == 0:
             raise AttributeError('{} has no attribute {} and no attributes starting with {}'.format(
                     self.__class__.__name__, item, prefix))
