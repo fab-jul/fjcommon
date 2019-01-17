@@ -28,6 +28,8 @@ base:
     lr = 1e-5
     batch_size_train = 25
     batch_size_val = 0.5 * batch_size_train
+    conv_params = {'f': 5,
+                   'pad': 'zeros'}
 
 lr_sweep/lr_1e-6:
     use ../base
@@ -41,7 +43,7 @@ lr_sweep/lr_1e-4:
 
 # TODO:
 # - some support for per-module parameters. could be automatically generated? or unique syntax?
-
+from collections import defaultdict
 from os import path
 import os
 import sys
@@ -57,7 +59,6 @@ _PAT_PARAM = re.compile(r'^([^\s]+?)\s*=\s*(.+)$')
 
 
 _SUB_SEP = os.environ.get('FJCOMMON_CONFIGP_SUBSEP', '.')
-
 
 class _ParseError(Exception):
     pass
@@ -93,8 +94,65 @@ def _parse(config_p):
             return _update_config(_Config(), lines), path.abspath(config_p)
 
 
+class _BracketPairings(object):
+    def __init__(self, left, right):
+        self.l = left
+        self.r = right
+        self.num_left = 0
+
+    def match(self, c):
+        if c == self.l:
+            self.num_left += 1
+        elif c == self.r:
+            if self.num_left == 0:
+                raise SyntaxError('Found {} without left {}'.format(c, self.l))
+            self.num_left -= 1
+
+    def balanced(self):
+        return self.num_left == 0
+
+
+def _merge_multiline_statements(lines):
+    cur = ''
+    pairings = [_BracketPairings('(', ')'),
+                _BracketPairings('[', ']'),
+                _BracketPairings('{', '}')]
+    for l in lines:
+        cur += l.strip()
+        for c in l:
+            for p in pairings:
+                p.match(c)
+
+        if all(p.balanced() for p in pairings):
+            yield cur
+            cur = ''
+        else:  # at least one is unbalanced
+            continue
+
+    for p in pairings:
+        if not p.balanced():
+            raise SyntaxError('Missing {} in expression!'.format(p.r))
+
+
+def test_merger():
+    for i, o in (
+            (['a', 'b'], ['a', 'b']),
+            (['(a', 'b)'], ['(ab)']),
+            (['(a = {c )', 'b}'], ['(a = {c )b}']),  # invalid python but valid paren
+    ):
+        assert list(_merge_multiline_statements(i)) == o
+
+    import pytest
+    with pytest.raises(SyntaxError):
+        list(_merge_multiline_statements(['(a))']))
+    with pytest.raises(SyntaxError):
+        list(_merge_multiline_statements(['(a']))
+
+
+
+
 def _update_config(config, lines):
-    for line in lines:
+    for line in _merge_multiline_statements(lines):
         if not line or line.startswith('#'):
             continue
 
@@ -173,6 +231,8 @@ class _Config(object):  # placeholder object filled with setattr
             assert_exc(item in self.__dict__, 'Invalid parameter: {}'.format(item), AttributeError)
             yield self.__dict__[item]
 
+    # TODO: overwrite __setitem__ with tuple support
+
     def set_attr(self, k, v):
         if not self.is_valid_key(k):
             raise _ParseError('Invalid key: {}'.format(k))
@@ -212,7 +272,9 @@ def test_config(tmpdir):
         "L = 7",
         "c = L // 2",
         "ae.c = 123",
-        "ae.ae.d = 124"
+        "ae.ae.d = 124",
+        "test = {'a': 123,",
+        "        'b': 222}"
         ])
 
     print(spec)
@@ -225,6 +287,7 @@ def test_config(tmpdir):
     assert config.lr == 1e-4
     assert config.L == 7
     assert config.c == 3
+    assert config.test == {'a': 123, 'b': 222}
 
     config_ae = config.ae
     assert config_ae.c == 123
