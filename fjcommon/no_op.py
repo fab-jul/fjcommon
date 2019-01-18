@@ -1,7 +1,9 @@
 
 class _NoOp(object):
     """
-    Class that silently ignores calls to any function.
+    Class that silently ignores calls to any function. Use the singleton instance defined below, i.e.,
+        from fjcommon.no_op import NoOp
+    (See README.md)
     """
     def __getattr__(self, attr):
         return _no_op
@@ -17,6 +19,7 @@ class _NoOp(object):
         return NoOp
 
 
+# Singleton instance that should be used
 NoOp = _NoOp()
 
 

@@ -1,57 +1,96 @@
 """
-Simple and Re-usable Configuration File Framework for tracking unique machine experiment setups.
+Simple and Re-usable Configuration File Framework for tracking unique configuration files.
+
+## Example
+
+File `base.cf`:
+```
+constrain network_type :: LINEAR, DNN
+network_type = LINEAR
+
+lr = 1e-5
+batch_size_train = 25
+batch_size_val = 0.5 * batch_size_train
+conv_params = {'f': 5,
+ 'pad': 'zeros'}
+```
+
+File `lr_sweep/lr_1e-6.cf`:
+```
+use ../base
+lr = 1e-6
+```
+
+File `lr_sweep/lr_1e-4.cf`:
+```
+use ../base
+lr = 1e-4
+```
+
+## Syntax
 
 Uses configuration files with the following syntax:
 
+###   `use` statment
 The first line may contain a use statement, specifying a path to another config file, relative to the containing
-file. The specified file is parsed first. If a parameter is redefined in some file, the last definition is used
--   use statment
-        use <RELATIVE_PATH>
+file. The specified file is parsed first. If a parameter is redefined in some file, the last definition is used.
+
+```
+use <RELATIVE_PATH>
+```
 
 The following lines may contain
 
--   constrain statement
-        constrain <PARAM_NAME> :: <CONSTRAIN_VAL_1>, <CONSTRAIN_VAL_2>, ...
+###  `constrain` statement
+```
+ constrain <PARAM_NAME> :: <CONSTRAIN_VAL_1>, <CONSTRAIN_VAL_2>, ...
+```
 
--   parameter statement
-        <PARAM_NAME> = <PARAM_VALUE>
+###  `parameter` statement
+```
+ <PARAM_NAME> = <PARAM_VALUE>
+```
+where `<PARAM_VALUE>` is a python expression that can reference any previously defined parameters (see note below about this). Can also be a multi-line statement by enclosing it in round brackets
+```
+value = (123+
+		 456)
+```
+or a multi-line dictionary or list definition.
 
--   comment
-        # <COMMENT>
+###  Comments
+```
+ # <COMMENT>
+```
+is ignored.
 
-Example:
+## Note on using previously defined variables
 
-base:
-    constrain network_type :: LINEAR, DNN
-    network_type = LINEAR
+These variables should not be treated as placeholders. Example:
 
-    lr = 1e-5
-    batch_size_train = 25
-    batch_size_val = 0.5 * batch_size_train
-    conv_params = {'f': 5,
-                   'pad': 'zeros'}
-
-lr_sweep/lr_1e-6:
-    use ../base
-    lr = 1e-6
-
-lr_sweep/lr_1e-4:
-    use ../base
-    lr = 1e-4
-
+File `base.cf`:
+```
+batch_size_train = 25
+batch_size_val = 0.5 * batch_size_train
+```
+File `bigger_batches.cf`:
+```
+use base.cf
+batch_size_train = 50
+```
+In this case, when using `bigger_batches.cf`, `batch_size_val = 0.5 * 25` still, because it simply uses the value defined
+in `base.cf`.
 """
 
 # TODO:
 # - some support for per-module parameters. could be automatically generated? or unique syntax?
-from collections import defaultdict
-from os import path
-import os
-import sys
-import re
-import json
+
 import itertools
-from fjcommon.assertions import assert_exc
+import os
+import re
+from os import path
+
 from fjcommon import functools_ext as ft
+from fjcommon.assertions import assert_exc
 
 
 _PAT_CONSTRAIN = re.compile(r'^constrain\s+([^\s]+?)\s*::\s*(.+)$')
@@ -59,9 +98,6 @@ _PAT_PARAM = re.compile(r'^([^\s]+?)\s*=\s*(.+)$')
 
 
 _SUB_SEP = os.environ.get('FJCOMMON_CONFIGP_SUBSEP', '.')
-
-class _ParseError(Exception):
-    pass
 
 
 def parse_configs(*configs):
@@ -80,6 +116,13 @@ def parse(config_p):
     return config, rel_path
 
 
+# ------------------------------------------------------------------------------
+
+
+class _ParseError(Exception):
+    pass
+
+
 def _parse(config_p):
     with open(config_p, 'r') as f:
         lines = f.read().split('\n')
@@ -95,6 +138,7 @@ def _parse(config_p):
 
 
 class _BracketPairings(object):
+    """ Helper class for matching brackets """
     def __init__(self, left, right):
         self.l = left
         self.r = right
@@ -113,6 +157,10 @@ class _BracketPairings(object):
 
 
 def _merge_multiline_statements(lines):
+    """
+    Merge multiline statements into single line statements. Checks (), [], {}. Doesn't care about wrongly mixing
+    parenthesis, e.g., ([)], but this will be caught by the eval later.
+    """
     cur = ''
     pairings = [_BracketPairings('(', ')'),
                 _BracketPairings('[', ']'),
@@ -132,23 +180,6 @@ def _merge_multiline_statements(lines):
     for p in pairings:
         if not p.balanced():
             raise SyntaxError('Missing {} in expression!'.format(p.r))
-
-
-def test_merger():
-    for i, o in (
-            (['a', 'b'], ['a', 'b']),
-            (['(a', 'b)'], ['(ab)']),
-            (['(a = {c )', 'b}'], ['(a = {c )b}']),  # invalid python but valid paren
-    ):
-        assert list(_merge_multiline_statements(i)) == o
-
-    import pytest
-    with pytest.raises(SyntaxError):
-        list(_merge_multiline_statements(['(a))']))
-    with pytest.raises(SyntaxError):
-        list(_merge_multiline_statements(['(a']))
-
-
 
 
 def _update_config(config, lines):
@@ -265,6 +296,9 @@ class _Config(object):  # placeholder object filled with setattr
         return self
 
 
+# Tests ------------------------------------------------------------------------
+
+
 def test_config(tmpdir):
     import pytest
     spec = '\n'.join([
@@ -301,3 +335,16 @@ def test_config(tmpdir):
     # assert does not raise
     _update_config(_Config(), ['i = 5'])
 
+
+def test_merger():
+    for i, o in (
+            (['a', 'b'], ['a', 'b']),
+            (['(a', 'b)'], ['(ab)']),
+            (['(a = {c )', 'b}'], ['(a = {c )b}']),  # invalid python but valid paren
+    ):
+        assert list(_merge_multiline_statements(i)) == o
+    import pytest
+    with pytest.raises(SyntaxError):
+        list(_merge_multiline_statements(['(a))']))
+    with pytest.raises(SyntaxError):
+        list(_merge_multiline_statements(['(a']))
