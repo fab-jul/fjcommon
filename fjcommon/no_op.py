@@ -12,6 +12,13 @@ class _NoOp(object):
         """ Means NoOp() works, but also NoOp()()()... """
         return NoOp
 
+    def __getitem__(self, item):
+        return NoOp
+
+    def __setitem__(self, key, value):
+        pass
+
+    # support for context manager calls
     def __enter__(self):
         return NoOp
 
@@ -28,8 +35,14 @@ def _no_op(*args, **kwargs):
 
 
 def test_no_op():
-    n = NoOp()
+    n = NoOp
     n.foo().bar().baz()
 
     with n.some_ctx_mgr() as t:
         print(t.foo())
+
+
+def test_dict():
+    n = NoOp
+    n['foo']
+    n['bar'] = 123
