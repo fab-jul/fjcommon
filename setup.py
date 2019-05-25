@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(name='fjcommon',
       packages=['fjcommon'],
-      version='0.2.9',
+      version='0.2.10',
       author='fab-jul',
       author_email='fabianjul@gmail.com',
       description='Python code usable accross projects',
