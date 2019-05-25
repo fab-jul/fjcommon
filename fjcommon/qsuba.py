@@ -42,7 +42,7 @@ def main():
     p.add_argument('--duration', type=str,
                    help='If int: hours to run job. If str, expected to be HH:MM:SS.')
 
-    p.add_argument('--gpu', action='store_true', help='Whether to use gpu')
+    p.add_argument('--gpu', type=int, help='Whether to use gpu')
 
     p.add_argument('--skip_tailf', '-q', action='store_const', const=True,
                    help='If given, do not tail -f relevant log file.')
@@ -140,7 +140,7 @@ def run(flags, other_args):
                 other_args += ['--qsuba_dry_run']
 
         if flags.gpu:
-            qsub_call += ['-l', 'gpu=1']
+            qsub_call += ['-l', 'gpu={}'.format(flags.gpu)]
 
         # Set up env vars to pass
         env = get_envs(flags)
@@ -231,7 +231,7 @@ def tmp_run_file(pre_run_cmds, script_name, interpreter, remove):
         fn_tmp = '{}_sub_tmp.sh'.format(os.path.splitext(script_name)[0])
         with open(fn_tmp, 'w+') as f:
             f.write('#!/bin/bash\n')
-            f.write('uname -n; echo "Job ID: $JOB_ID"; echo "GPU: $SGE_GPU"\n')
+            f.write('uname -n; echo "Job ID: $JOB_ID"; echo "GPU: $CUDA_VISIBLE_DEVICES"\n')
             f.write('{}\n'.format(pre_run_cmds))
 
             # the idea here is that a submission file should be the same for the same script, independent of whether
@@ -240,7 +240,11 @@ def tmp_run_file(pre_run_cmds, script_name, interpreter, remove):
             gev = _GitEnvVars()
             f.write('if [[ -n ${gev.ref} ]]; then\n'.format(gev=gev))
             f.write(' mkdir -p ${gev.root} && cd "$_" && pwd\n'.format(gev=gev))
-            f.write(' if [[ -n $SGE_GPU ]]; then UNIQUE_ID=$SGE_GPU; else UNIQUE_ID="cpu"; fi\n'.format(gev=gev))
+            f.write(' '
+                    'if [[ -n $CUDA_VISIBLE_DEVICES ]]; '
+                    'then UNIQUE_ID=$CUDA_VISIBLE_DEVICES; '
+                    'else UNIQUE_ID="cpu"; '
+                    'fi\n'.format(gev=gev))
             f.write(' ${gev.qsuba_git_helper} $UNIQUE_ID ${gev.url} ${gev.ref}\n'.format(gev=gev))
             f.write(' rc=$?; if [[ $rc != 0 ]]; then echo "Error $rc"; exit $rc; fi\n')
             f.write(' cd $UNIQUE_ID/${gev.cd} && pwd  # where the repo has been cloned into\n'.format(gev=gev))
@@ -249,7 +253,7 @@ def tmp_run_file(pre_run_cmds, script_name, interpreter, remove):
 
             # Run script
             f.write('shift # removes initial -- argument, which is added automatically by qsuba\n')
-            f.write('CUDA_VISIBLE_DEVICES=$SGE_GPU {} {} "$@"\n'.format(interpreter, script_name))
+            f.write('{} {} "$@"\n'.format(interpreter, script_name))
         overwrite_if_changed(fn, fn_tmp)
     yield fn
     if remove:

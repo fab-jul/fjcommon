@@ -23,7 +23,7 @@ class _NoOp(object):
         return NoOp
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        return NoOp
+        pass
 
 
 # Singleton instance that should be used
@@ -40,6 +40,11 @@ def test_no_op():
 
     with n.some_ctx_mgr() as t:
         print(t.foo())
+
+    import pytest
+    with pytest.raises(ValueError):
+        with n.sommmm():
+            raise ValueError()
 
 
 def test_dict():

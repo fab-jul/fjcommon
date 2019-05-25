@@ -83,6 +83,7 @@ in `base.cf`.
 
 # TODO:
 # - some support for per-module parameters. could be automatically generated? or unique syntax?
+# - allow setting config.foo.bar = 10
 
 import itertools
 import os
@@ -269,6 +270,9 @@ class _Config(object):  # placeholder object filled with setattr
             raise _ParseError('Invalid key: {}'.format(k))
         setattr(self, k, v)
 
+    def __setattr__(self, key, value):
+        super(_Config, self).__setattr__(key, value)
+
     def __getattr__(self, item):
         """
         TODO: this is WIP. see top of file
@@ -334,6 +338,12 @@ def test_config(tmpdir):
         _update_config(_Config(), ['_illegal = 5'])
     # assert does not raise
     _update_config(_Config(), ['i = 5'])
+
+    # update values
+    config.c = 10
+    assert config.c == 10
+    config.__dict__['ae.c'] = 12
+    assert config.ae.c == 12
 
 
 def test_merger():
