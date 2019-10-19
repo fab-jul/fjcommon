@@ -70,12 +70,12 @@ The following lines may contain
 
 ###  `constrain` statement
 ```
- constrain <PARAM_NAME> :: <CONSTRAIN_VAL_1>, <CONSTRAIN_VAL_2>, ...
+constrain <PARAM_NAME> :: <CONSTRAIN_VAL_1>, <CONSTRAIN_VAL_2>, ...
 ```
 
 ###  `parameter` statement
 ```
- <PARAM_NAME> = <PARAM_VALUE>
+<PARAM_NAME> = <PARAM_VALUE>
 ```
 where `<PARAM_VALUE>` is a python expression that can reference any previously defined parameters (see note below about this). Can also be a multi-line statement by enclosing it in round brackets
 ```
@@ -90,10 +90,10 @@ value = "$DATA_DIR$/main"
 ```
         
 ###  Comments
+Lines starting with `#` are ignored:
 ```
- # <COMMENT>
+# <COMMENT>
 ```
-is ignored.
 
 ## Note on using previously defined variables
 
