@@ -50,12 +50,17 @@ The following lines may contain
 ```
  <PARAM_NAME> = <PARAM_VALUE>
 ```
-where `<PARAM_VALUE>` is a python expression that can reference any previously defined parameters (see note below about this). Can also be a multi-line statement by enclosing it in round brackets
+where `<PARAM_VALUE>` is a python expression that can reference any previously defined parameters
+(see note below about this). Can also be a multi-line statement by enclosing it in round brackets.
 ```
 value = (123+
 		 456)
 ```
 or a multi-line dictionary or list definition.
+
+To use environment variables, use $ENV_NAME$ (with two dollar signs):
+```
+value = "$DATA_DIR$/main"
 
 ###  Comments
 ```
@@ -95,6 +100,9 @@ from fjcommon.assertions import assert_exc
 
 
 _PAT_CONSTRAIN = re.compile(r'^constrain\s+([^\s]+?)\s*::\s*(.+)$')
+
+# First group matches name (which is everything except whitespace, [^\s])
+# Second group matches value
 _PAT_PARAM = re.compile(r'^([^\s]+?)\s*=\s*(.+)$')
 
 
@@ -183,6 +191,22 @@ def _merge_multiline_statements(lines):
             raise SyntaxError('Missing {} in expression!'.format(p.r))
 
 
+def _eval_envs(var_value):
+    if '$' not in var_value:
+        return var_value
+
+    while True:
+        m = re.search(r'\$(.*?)\$', var_value)
+        if not m:
+            break
+        env_var_name = m.group(1)
+        if env_var_name not in os.environ:
+            raise SyntaxError('Found environment variable in value but it is not defined:', env_var_name)
+        var_value = var_value[:m.start()] + os.environ[env_var_name] + var_value[m.end():]
+
+
+
+
 def _update_config(config, lines):
     for line in _merge_multiline_statements(lines):
         if not line or line.startswith('#'):
@@ -199,6 +223,8 @@ def _update_config(config, lines):
         if not param_match:
             raise ValueError('*** Invalid line: `{}`'.format(line))
         var_name, var_value = param_match.group(1, 2)
+        # evaluate environment variables
+        var_value = _eval_envs(var_value)
         # construct a dict with all attributes of the config plus all constraints. adding the constraints allows
         # us to write param = CONSTRAINT instead of param = 'CONSTRAINT'
         globals_dict = dict(config.__dict__, **{val: val for val in config.all_constraint_values()})
@@ -358,3 +384,10 @@ def test_merger():
         list(_merge_multiline_statements(['(a))']))
     with pytest.raises(SyntaxError):
         list(_merge_multiline_statements(['(a']))
+
+
+def test_eval_envs():
+    os.environ['DATA_DIR'] = 'tmp/dir'
+    os.environ['DATASET'] = 'tmp/dir'
+    _eval_envs('hello $DATA_DIR$/bla/bli is $DATASET$/hoho the $house')
+
