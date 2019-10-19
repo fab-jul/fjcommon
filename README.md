@@ -39,7 +39,7 @@ lr = 1e-5
 batch_size_train = 25
 batch_size_val = 0.5 * batch_size_train
 conv_params = {'f': 5,
- 'pad': 'zeros'}
+               'pad': 'zeros'}
 ```
 
 File `lr_sweep/lr_1e-6.cf`:
@@ -80,10 +80,15 @@ The following lines may contain
 where `<PARAM_VALUE>` is a python expression that can reference any previously defined parameters (see note below about this). Can also be a multi-line statement by enclosing it in round brackets
 ```
 value = (123+
-		 456)
+         456)
 ```
 or a multi-line dictionary or list definition.
 
+To use environment variables, use $ENV_NAME$ (with two dollar signs):
+```
+value = "$DATA_DIR$/main"
+```
+        
 ###  Comments
 ```
  # <COMMENT>

@@ -61,6 +61,7 @@ or a multi-line dictionary or list definition.
 To use environment variables, use $ENV_NAME$ (with two dollar signs):
 ```
 value = "$DATA_DIR$/main"
+```
 
 ###  Comments
 ```
