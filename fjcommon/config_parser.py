@@ -202,10 +202,9 @@ def _eval_envs(var_value):
             break
         env_var_name = m.group(1)
         if env_var_name not in os.environ:
-            raise SyntaxError('Found environment variable in value but it is not defined:', env_var_name)
+            raise SyntaxError(f'Found environment variable in value but it is not defined: {env_var_name}')
         var_value = var_value[:m.start()] + os.environ[env_var_name] + var_value[m.end():]
-
-
+    return var_value
 
 
 def _update_config(config, lines):
@@ -231,6 +230,8 @@ def _update_config(config, lines):
         globals_dict = dict(config.__dict__, **{val: val for val in config.all_constraint_values()})
         try:
             var_value = eval(var_value, globals_dict)  # pass current config as globals dict
+        except TypeError as e:
+            raise SyntaxError('Cannot parse line: {} // {}'.format(line, e))
         except SyntaxError:
             raise SyntaxError('Cannot parse line: {}'.format(line))
         config.assert_fullfills_constraint(var_name, var_value)
